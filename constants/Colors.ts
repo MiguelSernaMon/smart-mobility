@@ -24,3 +24,22 @@ export const Colors = {
     tabIconSelected: tintColorDark,
   },
 };
+
+export const ColorsApp = {
+  light: {
+    background: '#FFFFFF',
+    text: '#2c3e50',
+    tint: '#0a7ea4',
+    icon: '#1abc9c',
+    tabIconDefault: '#2c3e50',
+    tabIconSelected: '#3498db',
+  },
+  dark: {
+    background: '#FFFFFF',
+    text: '#2c3e50',
+    tint: '#0a7ea4',
+    icon: '#1abc9c',
+    tabIconDefault: '#2c3e50',
+    tabIconSelected: '#3498db',
+  },
+}
