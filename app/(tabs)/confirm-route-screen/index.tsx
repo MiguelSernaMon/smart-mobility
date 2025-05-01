@@ -254,10 +254,19 @@ export default function ConfirmRouteScreen() {
           setSelectedRoute(processedRoutes[0]);
         }
       } else {
-        // Código existente para manejo de error...
+        Alert.alert(
+          "No se encontraron rutas",
+          "No pudimos encontrar rutas disponibles para tu destino.",
+          [{ text: "OK" }]
+        );
       }
     } catch (error) {
-      // Código existente para manejo de error...
+      console.error('Error al buscar rutas:', error);
+      Alert.alert(
+        "Error",
+        "Ocurrió un error al buscar rutas. Inténtalo de nuevo.",
+        [{ text: "OK" }]
+      );
     } finally {
       setLoading(false);
     }
