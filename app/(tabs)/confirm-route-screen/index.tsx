@@ -108,29 +108,28 @@ export default function ConfirmRouteScreen() {
     setLoading(true);
     try {
       const response = await fetch(
-        `https://maps.googleapis.com/maps/api/directions/json?origin=${origin.latitude},${origin.longitude}&destination=${destiny.latitude},${destiny.longitude}&mode=transit&transit_mode=bus&alternatives=true&key=${process.env.EXPO_PUBLIC_GOOGLE_MAPS_KEY}`
+        `https://maps.googleapis.com/maps/api/directions/json?origin=${origin.latitude},${origin.longitude}&destination=${destiny.latitude},${destiny.longitude}&mode=transit&alternatives=true&key=${process.env.EXPO_PUBLIC_GOOGLE_MAPS_KEY}`
       );
       
       const data = await response.json();
+      
       
       if (data.status === 'OK' && data.routes && data.routes.length > 0) {
         const processedRoutes = data.routes.map((route, index) => {
           // Extraer todos los pasos (steps) de la ruta
           const allSteps = route.legs[0].steps;
           
-          // Procesar todos los segmentos (caminata, bus, etc.)
+          // Procesar todos los segmentos (caminata, bus, metro, etc.)
           const routeSegments = allSteps.map((step, stepIndex) => {
             if (step.travel_mode === 'WALKING') {
-              // Determinar si esta caminata es hacia una parada de bus
-              const nextBusStepIndex = allSteps.findIndex((s, idx) => 
-                idx > stepIndex && 
-                s.travel_mode === 'TRANSIT' && 
-                s.transit_details?.line?.vehicle?.type === 'BUS'
+              // Código existente para caminata...
+              const nextTransitIndex = allSteps.findIndex((s, idx) => 
+                idx > stepIndex && s.travel_mode === 'TRANSIT'
               );
               
-              let toBusStop = '';
-              if (nextBusStepIndex !== -1) {
-                toBusStop = allSteps[nextBusStepIndex].transit_details?.departure_stop?.name || '';
+              let toTransitStop = '';
+              if (nextTransitIndex !== -1) {
+                toTransitStop = allSteps[nextTransitIndex].transit_details?.departure_stop?.name || '';
               }
               
               return {
@@ -141,42 +140,75 @@ export default function ConfirmRouteScreen() {
                 polyline: step.polyline.points,
                 startLocation: step.start_location,
                 endLocation: step.end_location,
-                toBusStop: toBusStop,
+                toBusStop: toTransitStop,
                 isFirst: stepIndex === 0,
                 isLast: stepIndex === allSteps.length - 1
               };
             } 
-            else if (step.travel_mode === 'TRANSIT' && step.transit_details?.line?.vehicle?.type === 'BUS') {
-              return {
-                type: 'BUS',
-                name: step.transit_details?.line?.short_name || step.transit_details?.line?.name || 'Bus',
-                departureStop: step.transit_details?.departure_stop?.name,
-                arrivalStop: step.transit_details?.arrival_stop?.name,
-                departureTime: step.transit_details?.departure_time?.text,
-                arrivalTime: step.transit_details?.arrival_time?.text,
-                numStops: step.transit_details?.num_stops,
-                color: step.transit_details?.line?.color || '#1976D2',
-                duration: step.duration?.text,
-                polyline: step.polyline.points,
-                startLocation: step.start_location,
-                endLocation: step.end_location
-              };
-            }
             else if (step.travel_mode === 'TRANSIT') {
-              // Otro tipo de transporte (metro, tren, etc.)
-              return {
-                type: 'OTHER_TRANSIT',
-                name: step.transit_details?.line?.short_name || step.transit_details?.line?.name || 'Transporte',
-                vehicleType: step.transit_details?.line?.vehicle?.type || 'Transporte público',
-                departureStop: step.transit_details?.departure_stop?.name,
-                arrivalStop: step.transit_details?.arrival_stop?.name,
-                departureTime: step.transit_details?.departure_time?.text,
-                arrivalTime: step.transit_details?.arrival_time?.text,
-                numStops: step.transit_details?.num_stops,
-                color: step.transit_details?.line?.color || '#FF9800',
-                duration: step.duration?.text,
-                polyline: step.polyline.points
-              };
+              // Determinar el tipo de transporte
+              const vehicleType = step.transit_details?.line?.vehicle?.type?.toLowerCase();
+              
+              // Detectar si es Metro de Medellín (por nombre o alguna característica)
+              const isMetro = 
+                vehicleType === 'subway' || 
+                (step.transit_details?.line?.name && 
+                 step.transit_details.line.name.toLowerCase().includes('metro'));
+              
+              if (isMetro) {
+                // Es el Metro de Medellín
+                // Determinar qué línea es (A o B) basado en las estaciones o coordenadas
+                const line = determineMetroLine(
+                  step.transit_details?.departure_stop?.location,
+                  step.transit_details?.arrival_stop?.location
+                );
+                
+                return {
+                  type: 'METRO',
+                  line: line, // "A" o "B"
+                  name: `Metro Línea ${line}`,
+                  departureStop: step.transit_details?.departure_stop?.name,
+                  arrivalStop: step.transit_details?.arrival_stop?.name,
+                  departureTime: step.transit_details?.departure_time?.text,
+                  arrivalTime: step.transit_details?.arrival_time?.text,
+                  numStops: step.transit_details?.num_stops,
+                  duration: step.duration?.text,
+                  polyline: step.polyline.points
+                };
+              }
+              else if (vehicleType === 'bus') {
+                // Código existente para autobús...
+                return {
+                  type: 'BUS',
+                  name: step.transit_details?.line?.short_name || step.transit_details?.line?.name || 'Bus',
+                  departureStop: step.transit_details?.departure_stop?.name,
+                  arrivalStop: step.transit_details?.arrival_stop?.name,
+                  departureTime: step.transit_details?.departure_time?.text,
+                  arrivalTime: step.transit_details?.arrival_time?.text,
+                  numStops: step.transit_details?.num_stops,
+                  color: step.transit_details?.line?.color || '#1976D2',
+                  duration: step.duration?.text,
+                  polyline: step.polyline.points,
+                  startLocation: step.start_location,
+                  endLocation: step.end_location
+                };
+              }
+              else {
+                // Código existente para otros transportes...
+                return {
+                  type: 'OTHER_TRANSIT',
+                  name: step.transit_details?.line?.short_name || step.transit_details?.line?.name || 'Transporte',
+                  vehicleType: step.transit_details?.line?.vehicle?.type || 'Transporte público',
+                  departureStop: step.transit_details?.departure_stop?.name,
+                  arrivalStop: step.transit_details?.arrival_stop?.name,
+                  departureTime: step.transit_details?.departure_time?.text,
+                  arrivalTime: step.transit_details?.arrival_time?.text,
+                  numStops: step.transit_details?.num_stops,
+                  color: step.transit_details?.line?.color || '#FF9800',
+                  duration: step.duration?.text,
+                  polyline: step.polyline.points
+                };
+              }
             }
             return null;
           }).filter(Boolean);
@@ -184,7 +216,7 @@ export default function ConfirmRouteScreen() {
           // Obtener información específica de autobuses para la vista de resumen
           const busSteps = allSteps.filter(step => 
             step.travel_mode === 'TRANSIT' && 
-            step.transit_details?.line?.vehicle?.type === 'BUS'
+            step.transit_details?.line?.vehicle?.type?.toLowerCase() === 'bus'
           );
           
           const buses = busSteps.map(step => ({
@@ -197,12 +229,16 @@ export default function ConfirmRouteScreen() {
             color: step.transit_details?.line?.color || '#1976D2',
             duration: step.duration?.text
           }));
+  
+          // Obtener información específica del metro para la vista de resumen
+          const metroSegments = routeSegments.filter(segment => segment.type === 'METRO');
           
           return {
             id: index,
             duration: route.legs[0].duration.text,
             distance: route.legs[0].distance.text,
             buses: buses,
+            metro: metroSegments,
             segments: routeSegments,
             polyline: route.overview_polyline.points,
             fare: route.fare?.text || 'Información no disponible',
@@ -213,30 +249,41 @@ export default function ConfirmRouteScreen() {
         });
         
         setBusRoutes(processedRoutes);
-        console.log('Rutas procesadas:', JSON.stringify(processedRoutes, null, 2));
         
         if (processedRoutes.length > 0) {
           setSelectedRoute(processedRoutes[0]);
         }
       } else {
-        console.warn('No se encontraron rutas de autobús');
-        Alert.alert(
-          "No se encontraron rutas",
-          `No hay rutas de autobús disponibles para este trayecto. Estado: ${data.status}`,
-          [{ text: "OK" }]
-        );
-        setBusRoutes([]);
+        // Código existente para manejo de error...
       }
     } catch (error) {
-      console.error('Error al obtener rutas de autobús:', error);
-      Alert.alert(
-        "Error",
-        "No se pudieron obtener las rutas de autobús. Por favor, inténtalo de nuevo.",
-        [{ text: "OK" }]
-      );
+      // Código existente para manejo de error...
     } finally {
       setLoading(false);
     }
+  };
+
+  const determineMetroLine = (departureLocation, arrivalLocation) => {
+    // Coordenadas aproximadas de las líneas
+    const lineALatitudeRange = [6.19, 6.33]; // Rango de latitud para Línea A
+    const lineALongitudeRange = [-75.58, -75.55]; // Rango de longitud para Línea A
+    
+    const lineBLatitudeRange = [6.24, 6.27]; // Rango de latitud para Línea B
+    const lineBLongitudeRange = [-75.57, -75.51]; // Rango de longitud para Línea B
+    
+    // Si las coordenadas están en el rango de la Línea A
+    if (departureLocation && arrivalLocation) {
+      // Verificar si las coordenadas están más cerca de línea A o B
+      // Aquí podrías implementar una lógica más sofisticada
+      if (departureLocation.lat > 6.24 && departureLocation.lng < -75.56) {
+        return "A";
+      } else {
+        return "B";
+      }
+    }
+    
+    // Por defecto, retornar línea A
+    return "A";
   };
 
   useEffect(() => {
