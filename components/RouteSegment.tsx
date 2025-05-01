@@ -62,7 +62,7 @@ const RouteSegment = ({ segment, isLast }: RouteSegmentProps) => {
   if (segment.type === 'OTHER_TRANSIT') {
     const icon = segment.vehicleType === 'SUBWAY' ? '🚇' : 
                  segment.vehicleType === 'TRAM' ? '🚊' : 
-                 segment.vehicleType === 'TRAIN' ? '🚆' : '🚐';
+                 segment.vehicleType === 'TRAIN' ? '🚆' : '🚆';
     
     return (
       <View 

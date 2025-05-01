@@ -45,15 +45,12 @@ const RouteCard = ({
       
       <View style={styles.segmentsHeader}>
         <Text style={styles.segmentsTitle}>
-          {showFullPathDetails ? 'Ruta detallada:' : 'Buses en esta ruta:'}
+          {showFullPathDetails ? 'Ruta detallada:' : 'Transporte en esta ruta:'}
         </Text>
         <TouchableOpacity
           style={styles.toggleButton}
           onPress={togglePathDetails}
         >
-          <Text style={styles.toggleButtonText}>
-            {showFullPathDetails ? 'Ver resumen' : 'Ver detalle'}
-          </Text>
         </TouchableOpacity>
       </View>
       
