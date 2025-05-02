@@ -1,15 +1,20 @@
 import React, { useState, useEffect } from "react";
 import * as Location from "expo-location";
 import { StyleSheet, View, Alert, StatusBar, Platform, SafeAreaView } from "react-native";
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 
 import Header from "@/components/Header";
 import RouteMap from "@/components/RouteMap";
 import NoRoutesMessage from "@/components/NoRoutesMessage";
+import RouteActiveInfo from "@/components/RouteActiveInfo";
 
 export default function ConfirmRouteScreen() {
+  const params = useLocalSearchParams();
   const mapRef = React.useRef(null);
   const [statusBarHeight, setStatusBarHeight] = useState(0);
+
+  const [activeRoute, setActiveRoute] = useState(null);
+  const [activeRoutePolyline, setActiveRoutePolyline] = useState('');
 
   const [origin, setOrigin] = useState({
     latitude: 6.252565,
@@ -25,6 +30,31 @@ export default function ConfirmRouteScreen() {
     latitude: 6.296242626909633, 
     longitude: -75.57194844226433
   });
+
+  useEffect(() => {
+    if (params.selectedRouteId && params.polyline) {
+      setActiveRoutePolyline(params.polyline as string);
+      
+      // Si tenemos detalles de la ruta
+      if (params.routeDetails) {
+        try {
+          const routeDetails = JSON.parse(params.routeDetails as string);
+          setActiveRoute(routeDetails);
+          
+          // Actualizar origen y destino si existen en los detalles
+          if (routeDetails.origin) {
+            setOrigin(routeDetails.origin);
+          }
+          
+          if (routeDetails.destination) {
+            setDestiny(routeDetails.destination);
+          }
+        } catch (error) {
+          console.error('Error parsing route details:', error);
+        }
+      }
+    }
+  }, [params.selectedRouteId, params.polyline, params.routeDetails]);
 
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -301,6 +331,20 @@ export default function ConfirmRouteScreen() {
     return "A";
   };
 
+  // Cancelar la ruta activa
+  const cancelActiveRoute = () => {
+    setActiveRoute(null);
+    setActiveRoutePolyline('');
+    
+    // Volver a ajustar el mapa para mostrar origen y destino
+    if (mapRef.current) {
+      mapRef.current.fitToCoordinates(
+        [origin, destiny],
+        { edgePadding: { top: 100, right: 100, bottom: 100, left: 100 }, animated: true }
+      );
+    }
+  };
+
   useEffect(() => {
     getLocationPermission();
   }, []);
@@ -314,23 +358,33 @@ export default function ConfirmRouteScreen() {
         <View style={{ height: statusBarHeight }} />
       )}
       
-      <Header 
-        searchQuery={searchQuery}
-        setSearchQuery={setSearchQuery}
-        searchDestination={searchDestination}
-        searchLoading={searchLoading}
-        fetchBusRoutes={() => fetchBusRoutes()}
-        loading={loading}
-      />
+      {/* Solo mostrar el header de búsqueda si no hay ruta activa */}
+      {!activeRoute ? (
+        <Header 
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          searchDestination={searchDestination}
+          searchLoading={searchLoading}
+          fetchBusRoutes={() => fetchBusRoutes()}
+          loading={loading}
+        />
+      ) : (
+        <RouteActiveInfo 
+          route={activeRoute} 
+          onCancel={cancelActiveRoute} 
+        />
+      )}
       
       <RouteMap 
         mapRef={mapRef}
         origin={origin}
         setOrigin={setOrigin}
         destiny={destiny}
+        activeRoutePolyline={activeRoutePolyline}
       />
       
-      {!loading && <NoRoutesMessage />}
+      {/* Mostrar mensaje solo si no hay ruta activa ni está cargando */}
+      {!loading && !activeRoute && <NoRoutesMessage />}
     </SafeAreaView>
   </>
   );
