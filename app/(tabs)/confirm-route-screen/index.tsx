@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
 import * as Location from "expo-location";
 import { StyleSheet, View, Alert, StatusBar, Platform, SafeAreaView } from "react-native";
+import { router } from 'expo-router';
 
 import Header from "@/components/Header";
-import RoutesList from "@/components/RoutesList";
 import RouteMap from "@/components/RouteMap";
 import NoRoutesMessage from "@/components/NoRoutesMessage";
 
@@ -16,20 +16,17 @@ export default function ConfirmRouteScreen() {
     longitude: -75.570568,
   });
 
-    // Obtener la altura de la barra de estado al cargar el componente
-    useEffect(() => {
-      setStatusBarHeight(StatusBar.currentHeight || 0);
-    }, []);
+  // Obtener la altura de la barra de estado al cargar el componente
+  useEffect(() => {
+    setStatusBarHeight(StatusBar.currentHeight || 0);
+  }, []);
 
   const [destiny, setDestiny] = useState({
     latitude: 6.296242626909633, 
     longitude: -75.57194844226433
   });
 
-  const [busRoutes, setBusRoutes] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [selectedRoute, setSelectedRoute] = useState(null);
-  const [showFullPathDetails, setShowFullPathDetails] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchLoading, setSearchLoading] = useState(false);
 
@@ -72,7 +69,7 @@ export default function ConfirmRouteScreen() {
           "Destino establecido",
           `Destino: ${data.results[0].formatted_address}`,
           [
-            { text: "Buscar rutas", onPress: fetchBusRoutes },
+            { text: "Buscar rutas", onPress: () => fetchBusRoutes(newDestiny) },
             { text: "OK" }
           ]
         );
@@ -110,15 +107,16 @@ export default function ConfirmRouteScreen() {
     });
   }
 
-  const fetchBusRoutes = async () => {
+  const fetchBusRoutes = async (destinationCoords = null) => {
     setLoading(true);
+    const destCoords = destinationCoords || destiny;
+    
     try {
       const response = await fetch(
-        `https://maps.googleapis.com/maps/api/directions/json?origin=${origin.latitude},${origin.longitude}&destination=${destiny.latitude},${destiny.longitude}&mode=transit&alternatives=true&key=${process.env.EXPO_PUBLIC_GOOGLE_MAPS_KEY}`
+        `https://maps.googleapis.com/maps/api/directions/json?origin=${origin.latitude},${origin.longitude}&destination=${destCoords.latitude},${destCoords.longitude}&mode=transit&alternatives=true&key=${process.env.EXPO_PUBLIC_GOOGLE_MAPS_KEY}`
       );
       
       const data = await response.json();
-      
       
       if (data.status === 'OK' && data.routes && data.routes.length > 0) {
         const processedRoutes = data.routes.map((route, index) => {
@@ -253,12 +251,14 @@ export default function ConfirmRouteScreen() {
             totalSegments: routeSegments.length
           };
         });
+
+        // Guardar las rutas en el almacenamiento local (puedes usar AsyncStorage)
+        // y navegar a la página de explore
+        router.push({
+          pathname: '/(tabs)/explore',
+          params: { routes: JSON.stringify(processedRoutes) }
+        });
         
-        setBusRoutes(processedRoutes);
-        
-        if (processedRoutes.length > 0) {
-          setSelectedRoute(processedRoutes[0]);
-        }
       } else {
         Alert.alert(
           "No se encontraron rutas",
@@ -305,11 +305,6 @@ export default function ConfirmRouteScreen() {
     getLocationPermission();
   }, []);
 
-  // Toggle para mostrar todos los segmentos o solo el resumen
-  const togglePathDetails = () => {
-    setShowFullPathDetails(!showFullPathDetails);
-  };
-
   return (
     <>
     <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
@@ -324,29 +319,18 @@ export default function ConfirmRouteScreen() {
         setSearchQuery={setSearchQuery}
         searchDestination={searchDestination}
         searchLoading={searchLoading}
-        fetchBusRoutes={fetchBusRoutes}
+        fetchBusRoutes={() => fetchBusRoutes()}
         loading={loading}
       />
-      
-      {busRoutes.length > 0 && (
-        <RoutesList 
-          busRoutes={busRoutes}
-          selectedRoute={selectedRoute}
-          setSelectedRoute={setSelectedRoute}
-          showFullPathDetails={showFullPathDetails}
-          togglePathDetails={togglePathDetails}
-        />
-      )}
       
       <RouteMap 
         mapRef={mapRef}
         origin={origin}
         setOrigin={setOrigin}
         destiny={destiny}
-        selectedRoute={selectedRoute}
       />
       
-      {busRoutes.length === 0 && !loading && <NoRoutesMessage />}
+      {!loading && <NoRoutesMessage />}
     </SafeAreaView>
   </>
   );
