@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import * as Location from "expo-location";
-import { StyleSheet, View, Alert } from "react-native";
+import { StyleSheet, View, Alert, StatusBar, Platform, SafeAreaView } from "react-native";
 
 import Header from "@/components/Header";
 import RoutesList from "@/components/RoutesList";
@@ -9,11 +9,17 @@ import NoRoutesMessage from "@/components/NoRoutesMessage";
 
 export default function ConfirmRouteScreen() {
   const mapRef = React.useRef(null);
+  const [statusBarHeight, setStatusBarHeight] = useState(0);
 
   const [origin, setOrigin] = useState({
     latitude: 6.252565,
     longitude: -75.570568,
   });
+
+    // Obtener la altura de la barra de estado al cargar el componente
+    useEffect(() => {
+      setStatusBarHeight(StatusBar.currentHeight || 0);
+    }, []);
 
   const [destiny, setDestiny] = useState({
     latitude: 6.296242626909633, 
@@ -305,7 +311,14 @@ export default function ConfirmRouteScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <>
+    <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
+    <SafeAreaView style={styles.container}>
+      {/* Espacio para la barra de estado en Android */}
+      {Platform.OS === 'android' && (
+        <View style={{ height: statusBarHeight }} />
+      )}
+      
       <Header 
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
@@ -334,7 +347,8 @@ export default function ConfirmRouteScreen() {
       />
       
       {busRoutes.length === 0 && !loading && <NoRoutesMessage />}
-    </View>
+    </SafeAreaView>
+  </>
   );
 }
 
