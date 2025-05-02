@@ -13,7 +13,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import RouteSegment from './RouteSegment';
 import { router } from 'expo-router';
-import MapView, { Marker, Polyline } from 'react-native-maps';
+import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import { decode } from '@mapbox/polyline';
 
 interface RouteDetailsModalProps {
@@ -26,13 +26,19 @@ const RouteDetailsModal = ({ route, visible, onClose }: RouteDetailsModalProps) 
   const mapRef = useRef(null);
   
   if (!route) return null;
+
+  // Función para decodificar polylines
+  const decodePolyline = (encoded) => {
+    if (!encoded) return [];
+    return decode(encoded).map(point => ({
+      latitude: point[0],
+      longitude: point[1]
+    }));
+  };
   
-  // Decodificar la polyline para mostrar la ruta en el mapa
+  // Decodificar la polyline general para mostrar la ruta completa
   const decodedPoints = route.polyline 
-    ? decode(route.polyline).map((point: number[]) => ({
-        latitude: point[0],
-        longitude: point[1],
-      }))
+    ? decodePolyline(route.polyline)
     : [];
     
   // Obtener origen y destino de la ruta
@@ -50,14 +56,19 @@ const RouteDetailsModal = ({ route, visible, onClose }: RouteDetailsModalProps) 
       params: { 
         selectedRouteId: route.id.toString(),
         polyline: route.polyline,
-        // Incluir otros detalles necesarios
+        // Incluir todos los detalles necesarios
         routeDetails: JSON.stringify({
           origin: origin,
           destination: destination,
           routeId: route.id,
           duration: route.duration,
           distance: route.distance,
-          segments: JSON.stringify(route.segments)
+          segments: JSON.stringify(route.segments),
+          buses: route.buses,
+          metro: route.metro,
+          fare: route.fare,
+          departureTime: route.departureTime,
+          arrivalTime: route.arrivalTime
         })
       }
     });
@@ -76,6 +87,23 @@ const RouteDetailsModal = ({ route, visible, onClose }: RouteDetailsModalProps) 
       );
     }
   }, [visible]);
+  
+  // Función para obtener color según el tipo de segmento
+  const getSegmentColor = (type) => {
+    switch (type) {
+      case 'WALKING':
+        return '#4CAF50'; // Verde para caminatas
+      case 'BUS':
+        return '#1976D2'; // Color específico del bus o azul por defecto
+      case 'METRO':
+        return '#FF5722'; // Naranja para metro
+      default:
+        return '#9C27B0'; // Violeta para otros transportes
+    }
+  };
+  
+  // Verificar que los segmentos tengan la información necesaria
+  console.log("Route segments:", route.segments ? route.segments.length : 0);
   
   return (
     <Modal
@@ -96,6 +124,7 @@ const RouteDetailsModal = ({ route, visible, onClose }: RouteDetailsModalProps) 
         <View style={styles.mapContainer}>
           <MapView
             ref={mapRef}
+            provider={PROVIDER_GOOGLE}
             style={styles.map}
             initialRegion={{
               latitude: origin ? origin.latitude : 6.252565,
@@ -108,22 +137,120 @@ const RouteDetailsModal = ({ route, visible, onClose }: RouteDetailsModalProps) 
             {origin && (
               <Marker
                 coordinate={origin}
-                pinColor="#1976D2"
                 title="Origen"
-              />
+              >
+                <View style={styles.originMarker}>
+                  <Text style={styles.markerText}>📍</Text>
+                </View>
+              </Marker>
             )}
             
             {/* Marcador de destino */}
             {destination && (
               <Marker
                 coordinate={destination}
-                pinColor="#D32F2F"
                 title="Destino"
-              />
+              >
+                <View style={styles.destinyMarker}>
+                  <Text style={styles.markerText}>🏁</Text>
+                </View>
+              </Marker>
             )}
             
-            {/* Polyline de la ruta */}
-            {decodedPoints.length > 0 && (
+            {/* Segmentos de ruta con colores según tipo */}
+            {route.segments && route.segments.map((segment, idx) => {
+              if (!segment || !segment.polyline) return null;
+              
+              const segmentPoints = decodePolyline(segment.polyline);
+              if (segmentPoints.length === 0) return null;
+              
+              return (
+                <Polyline
+                  key={`segment-${idx}`}
+                  coordinates={segmentPoints}
+                  strokeWidth={5}
+                  strokeColor={getSegmentColor(segment.type)}
+                  zIndex={3}
+                />
+              );
+            })}
+            
+            {/* Paradas de autobús */}
+            {route.segments && route.segments
+              .filter(segment => segment.type === 'BUS' && segment.polyline)
+              .map((segment, idx) => {
+                const busStopPoints = decodePolyline(segment.polyline);
+                if (!busStopPoints || busStopPoints.length === 0) return null;
+                
+                return (
+                  <React.Fragment key={`bus-stops-${idx}`}>
+                    {/* Parada de salida */}
+                    <Marker
+                      key={`bus-start-${idx}`}
+                      coordinate={busStopPoints[0]}
+                      title={segment.departureStop || 'Parada de salida'}
+                      description={`Bus: ${segment.name || ''}`}
+                    >
+                      <View style={styles.busStopMarker}>
+                        <Text style={styles.markerText}>🚏</Text>
+                      </View>
+                    </Marker>
+                    
+                    {/* Parada de llegada */}
+                    <Marker
+                      key={`bus-end-${idx}`}
+                      coordinate={busStopPoints[busStopPoints.length - 1]}
+                      title={segment.arrivalStop || 'Parada de llegada'}
+                      description={`Bus: ${segment.name || ''}`}
+                    >
+                      <View style={styles.busStopMarker}>
+                        <Text style={styles.markerText}>🚏</Text>
+                      </View>
+                    </Marker>
+                  </React.Fragment>
+                );
+              })
+            }
+            
+            {/* Estaciones de metro */}
+            {route.segments && route.segments
+              .filter(segment => segment.type === 'METRO' && segment.polyline)
+              .map((segment, idx) => {
+                const metroStopPoints = decodePolyline(segment.polyline);
+                if (!metroStopPoints || metroStopPoints.length === 0) return null;
+                
+                return (
+                  <React.Fragment key={`metro-stops-${idx}`}>
+                    {/* Estación de salida */}
+                    <Marker
+                      key={`metro-start-${idx}`}
+                      coordinate={metroStopPoints[0]}
+                      title={segment.departureStop || 'Estación de salida'}
+                      description={`Metro Línea ${segment.line || ''}`}
+                    >
+                      <View style={styles.metroStopMarker}>
+                        <Text style={styles.markerText}>🚇</Text>
+                      </View>
+                    </Marker>
+                    
+                    {/* Estación de llegada */}
+                    <Marker
+                      key={`metro-end-${idx}`}
+                      coordinate={metroStopPoints[metroStopPoints.length - 1]}
+                      title={segment.arrivalStop || 'Estación de llegada'}
+                      description={`Metro Línea ${segment.line || ''}`}
+                    >
+                      <View style={styles.metroStopMarker}>
+                        <Text style={styles.markerText}>🚇</Text>
+                      </View>
+                    </Marker>
+                  </React.Fragment>
+                );
+              })
+            }
+            
+            {/* Polyline de la ruta completa (como reserva si los segmentos fallan) */}
+            {!route.segments && decodedPoints.length > 0 && (
               <Polyline
                 coordinates={decodedPoints}
                 strokeWidth={4}
@@ -165,7 +292,8 @@ const RouteDetailsModal = ({ route, visible, onClose }: RouteDetailsModalProps) 
               <Ionicons name="swap-vertical-outline" size={20} color="#1976D2" />
               <Text style={styles.summaryLabel}>Trasbordos</Text>
               <Text style={styles.summaryValue}>
-                {route.buses.length + (route.metro ? route.metro.length : 0) - 1}
+                {route.buses && route.metro ? 
+                  route.buses.length + (route.metro.length || 0) - 1 : '0'}
               </Text>
             </View>
           </View>
@@ -188,7 +316,7 @@ const RouteDetailsModal = ({ route, visible, onClose }: RouteDetailsModalProps) 
         <ScrollView style={styles.segmentsContainer}>
           <Text style={styles.sectionTitle}>Instrucciones detalladas</Text>
           
-          {route.segments.map((segment, index) => (
+          {route.segments && route.segments.map((segment, index) => (
             <RouteSegment 
               key={`segment-${index}`}
               segment={segment} 
@@ -253,7 +381,7 @@ const styles = StyleSheet.create({
     marginLeft: 16,
   },
   mapContainer: {
-    height: 200,
+    height: 220,
     width: '100%',
     position: 'relative',
   },
@@ -400,6 +528,37 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 16,
     marginLeft: 8,
+  },
+  originMarker: {
+    backgroundColor: 'white',
+    borderRadius: 20,
+    padding: 5,
+    borderWidth: 1,
+    borderColor: '#007bff',
+  },
+  destinyMarker: {
+    backgroundColor: 'white',
+    borderRadius: 20,
+    padding: 5,
+    borderWidth: 1,
+    borderColor: 'red',
+  },
+  busStopMarker: {
+    backgroundColor: 'white',
+    borderRadius: 20,
+    padding: 5,
+    borderWidth: 1,
+    borderColor: '#1976D2',
+  },
+  metroStopMarker: {
+    backgroundColor: 'white',
+    borderRadius: 20,
+    padding: 5,
+    borderWidth: 1,
+    borderColor: '#FF5722',
+  },
+  markerText: {
+    fontSize: 20,
   },
 });
 

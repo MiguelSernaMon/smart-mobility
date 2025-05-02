@@ -39,6 +39,12 @@ export default function ConfirmRouteScreen() {
       if (params.routeDetails) {
         try {
           const routeDetails = JSON.parse(params.routeDetails as string);
+          
+          // Si los segmentos están serializados, los deserializamos
+          if (typeof routeDetails.segments === 'string') {
+            routeDetails.segments = JSON.parse(routeDetails.segments);
+          }
+          
           setActiveRoute(routeDetails);
           
           // Actualizar origen y destino si existen en los detalles

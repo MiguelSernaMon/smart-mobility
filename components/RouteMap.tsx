@@ -1,7 +1,8 @@
-import React, { useEffect } from 'react';
-import { StyleSheet, View, Text } from 'react-native';
-import MapView, { Marker, Polyline, Callout, Circle } from 'react-native-maps';
-import { decode } from '@mapbox/polyline';
+import React, { useEffect } from "react";
+import { StyleSheet, Text, View, Platform } from "react-native";
+import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from "react-native-maps";
+import MapViewDirections from "react-native-maps-directions";
+import { decode } from "@mapbox/polyline";
 
 interface SpeedLimit {
   id: string;
@@ -24,124 +25,312 @@ interface SchoolZone {
 
 interface RouteMapProps {
   mapRef: React.RefObject<MapView>;
-  origin: {
-    latitude: number;
-    longitude: number;
-  };
-  setOrigin: (location: { latitude: number; longitude: number }) => void;
-  destiny: {
-    latitude: number;
-    longitude: number;
-  };
-  selectedRoute?: any;
+  origin: { latitude: number; longitude: number };
+  setOrigin: (origin: { latitude: number; longitude: number }) => void;
+  destiny: { latitude: number; longitude: number };
   speedLimits?: SpeedLimit[];
   schoolZones?: SchoolZone[];
   activeRoutePolyline?: string;
+  activeRoute?: any;
 }
 
-const RouteMap: React.FC<RouteMapProps> = ({ 
+const RouteMap = ({ 
   mapRef, 
   origin, 
   setOrigin, 
-  destiny, 
-  selectedRoute,
+  destiny,
   speedLimits = [],
   schoolZones = [],
-  activeRoutePolyline
-}) => {
-  // Decodificar la polyline de la ruta seleccionada o activa
-  const polylineToUse = activeRoutePolyline || (selectedRoute?.polyline || '');
+  activeRoutePolyline = '',
+  activeRoute = null
+}: RouteMapProps) => {
   
-  const decodedPoints = polylineToUse 
-    ? decode(polylineToUse).map((point: number[]) => ({
+  // Verificar si hay una ruta activa o seleccionada
+  const selectedRoute = activeRoute;
+  
+  // Función para decodificar polylines
+  const decodePolyline = (encoded) => {
+    if (!encoded) return [];
+    try {
+      return decode(encoded).map(point => ({
         latitude: point[0],
-        longitude: point[1],
-      }))
-    : [];
-
-  // Ajustar el mapa cuando hay una ruta activa
-  useEffect(() => {
-    if (mapRef.current && decodedPoints.length > 0) {
-      mapRef.current.fitToCoordinates(
-        decodedPoints,
-        { edgePadding: { top: 100, right: 100, bottom: 100, left: 100 }, animated: true }
-      );
+        longitude: point[1]
+      }));
+    } catch (error) {
+      console.error('Error decoding polyline:', error);
+      return [];
     }
-  }, [activeRoutePolyline, selectedRoute]);
-
+  };
+  
+  // Ajustar el mapa para mostrar todos los puntos relevantes
+  useEffect(() => {
+    if (!mapRef.current) return;
+    
+    if (selectedRoute && selectedRoute.segments && selectedRoute.segments.length > 0) {
+      console.log("Adjusting map for segments, count:", selectedRoute.segments.length);
+      
+      // Si hay segmentos, obtener todos los puntos para ajustar el mapa
+      const allPoints = [];
+      
+      selectedRoute.segments.forEach(segment => {
+        if (segment && segment.polyline) {
+          const points = decodePolyline(segment.polyline);
+          if (points && points.length > 0) {
+            allPoints.push(...points);
+          }
+        }
+      });
+      
+      if (allPoints.length > 0) {
+        console.log("Fitting to coordinates with segments, points:", allPoints.length);
+        mapRef.current.fitToCoordinates(allPoints, {
+          edgePadding: { top: 100, right: 100, bottom: 100, left: 100 },
+          animated: true
+        });
+      } else {
+        // Si los segmentos no tienen puntos válidos, ajustar a origen y destino
+        mapRef.current.fitToCoordinates([origin, destiny], {
+          edgePadding: { top: 100, right: 100, bottom: 100, left: 100 },
+          animated: true
+        });
+      }
+    } else if (activeRoutePolyline) {
+      console.log("Adjusting map for activeRoutePolyline");
+      // Si hay una polyline de ruta activa pero no hay segmentos
+      const points = decodePolyline(activeRoutePolyline);
+      if (points.length > 0) {
+        console.log("Fitting to coordinates with polyline, points:", points.length);
+        mapRef.current.fitToCoordinates(points, {
+          edgePadding: { top: 100, right: 100, bottom: 100, left: 100 },
+          animated: true
+        });
+      } else {
+        // Si la polyline no tiene puntos válidos, ajustar a origen y destino
+        mapRef.current.fitToCoordinates([origin, destiny], {
+          edgePadding: { top: 100, right: 100, bottom: 100, left: 100 },
+          animated: true
+        });
+      }
+    } else {
+      console.log("Adjusting map for origin and destiny");
+      // Si no hay ruta, mostrar origen y destino
+      mapRef.current.fitToCoordinates([origin, destiny], {
+        edgePadding: { top: 100, right: 100, bottom: 100, left: 100 },
+        animated: true
+      });
+    }
+  }, [selectedRoute, activeRoutePolyline, origin, destiny]);
+  
   return (
-    <MapView
+    <MapView 
       ref={mapRef}
       style={styles.map}
+      provider={PROVIDER_GOOGLE}
       initialRegion={{
         latitude: origin.latitude,
         longitude: origin.longitude,
-        latitudeDelta: 0.05,
-        longitudeDelta: 0.05,
+        latitudeDelta: 0.0922,
+        longitudeDelta: 0.0421,
       }}
     >
       {/* Marcador de origen */}
-      <Marker
-        coordinate={origin}
-        draggable
+      <Marker 
+        coordinate={origin} 
+        title="Ubicación"
+        draggable={true}
         onDragEnd={(e) => setOrigin(e.nativeEvent.coordinate)}
-        pinColor="#1976D2"
-        title="Origen"
-      />
+        description="Esta es tu ubicación"
+      >
+        <View style={styles.originMarker}>
+          <Text style={styles.markerText}>📍</Text>
+        </View>
+      </Marker>
       
       {/* Marcador de destino */}
-      <Marker
-        coordinate={destiny}
-        pinColor="#D32F2F"
-        title="Destino"
-      />
+      <Marker 
+        coordinate={destiny} 
+        title="Destino" 
+        description="Este es tu destino"
+      >
+        <View style={styles.destinyMarker}>
+          <Text style={styles.markerText}>🏁</Text>
+        </View>
+      </Marker>
       
-      {/* Polyline de la ruta */}
-      {decodedPoints.length > 0 && (
+      {/* Dibujar segmentos de ruta con diferentes colores */}
+      {selectedRoute && selectedRoute.segments && selectedRoute.segments.map((segment, idx) => {
+        if (!segment || !segment.polyline) {
+          console.log("Invalid segment at index", idx);
+          return null;
+        }
+        
+        const decodedPoints = decodePolyline(segment.polyline);
+        
+        if (!decodedPoints || decodedPoints.length === 0) {
+          console.log("No points in segment at index", idx);
+          return null;
+        }
+        
+        let color;
+        
+        if (segment.type === 'WALKING') {
+          color = '#4CAF50'; // Verde para caminatas
+        } else if (segment.type === 'BUS') {
+          color = segment.color || '#1976D2'; // Color específico del bus o azul por defecto
+        } else if (segment.type === 'METRO') {
+          color = '#FF5722'; // Naranja para metro
+        } else {
+          color = segment.color || '#FF9800'; // Color para otros transportes o naranja por defecto
+        }
+        
+        console.log(`Drawing segment ${idx} of type ${segment.type} with ${decodedPoints.length} points and color ${color}`);
+        
+        return (
+          <Polyline
+            key={`segment-${idx}`}
+            coordinates={decodedPoints}
+            strokeWidth={5}
+            strokeColor={color}
+            zIndex={3}
+          />
+        );
+      })}
+      
+      {/* Si no hay segmentos pero hay una polyline, mostrarla */}
+      {(!selectedRoute || !selectedRoute.segments || selectedRoute.segments.length === 0) && activeRoutePolyline && (
         <Polyline
-          coordinates={decodedPoints}
+          coordinates={decodePolyline(activeRoutePolyline)}
           strokeWidth={4}
           strokeColor="#1976D2"
+          zIndex={2}
         />
       )}
-
+      
+      {/* Mostrar paradas de autobús */}
+      {selectedRoute && selectedRoute.segments && selectedRoute.segments
+        .filter(segment => segment && segment.type === 'BUS' && segment.polyline)
+        .map((segment, idx) => {
+          const busStopPoints = decodePolyline(segment.polyline);
+          
+          // Solo renderizar si hay puntos
+          if (!busStopPoints || busStopPoints.length === 0) return null;
+          
+          console.log(`Drawing bus stops for segment ${idx} with ${busStopPoints.length} points`);
+          
+          return (
+            <React.Fragment key={`bus-stops-${idx}`}>
+              {/* Parada de salida */}
+              <Marker
+                key={`busstop-start-${idx}`}
+                coordinate={busStopPoints[0]}
+                title={`Parada: ${segment.departureStop || 'Salida'}`}
+                description={`Bus: ${segment.name || ''}`}
+                zIndex={4}
+              >
+                <View style={styles.busStopMarker}>
+                  <Text style={styles.markerText}>🚏</Text>
+                </View>
+              </Marker>
+              
+              {/* Parada de llegada */}
+              <Marker
+                key={`busstop-end-${idx}`}
+                coordinate={busStopPoints[busStopPoints.length - 1]}
+                title={`Parada: ${segment.arrivalStop || 'Llegada'}`}
+                description={`Bus: ${segment.name || ''}`}
+                zIndex={4}
+              >
+                <View style={styles.busStopMarker}>
+                  <Text style={styles.markerText}>🚏</Text>
+                </View>
+              </Marker>
+            </React.Fragment>
+          );
+        })
+      }
+      
+      {/* Mostrar estaciones de metro */}
+      {selectedRoute && selectedRoute.segments && selectedRoute.segments
+        .filter(segment => segment && segment.type === 'METRO' && segment.polyline)
+        .map((segment, idx) => {
+          const metroStopPoints = decodePolyline(segment.polyline);
+          
+          // Solo renderizar si hay puntos
+          if (!metroStopPoints || metroStopPoints.length === 0) return null;
+          
+          console.log(`Drawing metro stops for segment ${idx} with ${metroStopPoints.length} points`);
+          
+          return (
+            <React.Fragment key={`metro-stops-${idx}`}>
+              {/* Estación de salida */}
+              <Marker
+                key={`metrostop-start-${idx}`}
+                coordinate={metroStopPoints[0]}
+                title={`Estación: ${segment.departureStop || 'Salida'}`}
+                description={`Metro Línea ${segment.line || ''}`}
+                zIndex={4}
+              >
+                <View style={styles.metroStopMarker}>
+                  <Text style={styles.markerText}>🚇</Text>
+                </View>
+              </Marker>
+              
+              {/* Estación de llegada */}
+              <Marker
+                key={`metrostop-end-${idx}`}
+                coordinate={metroStopPoints[metroStopPoints.length - 1]}
+                title={`Estación: ${segment.arrivalStop || 'Llegada'}`}
+                description={`Metro Línea ${segment.line || ''}`}
+                zIndex={4}
+              >
+                <View style={styles.metroStopMarker}>
+                  <Text style={styles.markerText}>🚇</Text>
+                </View>
+              </Marker>
+            </React.Fragment>
+          );
+        })
+      }
+      
+      {/* Si no hay ruta seleccionada, mostrar una dirección entre origen y destino */}
+      {(!selectedRoute && !activeRoutePolyline) && (
+        <MapViewDirections 
+          origin={origin}
+          destination={destiny}
+          apikey={process.env.EXPO_PUBLIC_GOOGLE_MAPS_KEY}
+          strokeWidth={3}
+          strokeColor="red"
+          zIndex={1}
+        />
+      )}
+      
       {/* Marcadores de límites de velocidad */}
       {speedLimits.map((limit, index) => (
         <Marker
           key={`speed-${index}`}
           coordinate={limit.position}
-          anchor={{ x: 0.5, y: 0.5 }}
+          title={`Límite: ${limit.value} ${limit.unit}`}
+          zIndex={5}
         >
           <View style={styles.speedLimitMarker}>
             <Text style={styles.speedLimitText}>{limit.value}</Text>
           </View>
-          <Callout>
-            <Text>Límite: {limit.value} {limit.unit}</Text>
-          </Callout>
         </Marker>
       ))}
       
       {/* Zonas escolares */}
-      {schoolZones.map((zone) => (
-        <React.Fragment key={`school-${zone.id}`}>
-          <Circle
-            center={zone.position}
-            radius={200} // Radio de 200m alrededor de la escuela
-            fillColor="rgba(255,165,0,0.2)" // Naranja semi-transparente
-            strokeColor="rgba(255,165,0,0.5)"
-            strokeWidth={1}
-          />
-          <Marker
-            coordinate={zone.position}
-            pinColor="orange"
-          >
-            <Callout>
-              <Text>{zone.title}</Text>
-              <Text>Zona Escolar - Precaución</Text>
-              <Text>Límite: 30 km/h</Text>
-            </Callout>
-          </Marker>
-        </React.Fragment>
+      {schoolZones.map((zone, index) => (
+        <Marker
+          key={`school-${index}`}
+          coordinate={zone.position}
+          title={zone.title}
+          description="Zona Escolar - Límite 30 km/h"
+          zIndex={5}
+        >
+          <View style={styles.schoolZoneMarker}>
+            <Text style={styles.markerText}>🏫</Text>
+          </View>
+        </Marker>
       ))}
     </MapView>
   );
@@ -150,6 +339,34 @@ const RouteMap: React.FC<RouteMapProps> = ({
 const styles = StyleSheet.create({
   map: {
     flex: 1,
+  },
+  originMarker: {
+    backgroundColor: 'white',
+    borderRadius: 20,
+    padding: 5,
+    borderWidth: 1,
+    borderColor: '#007bff',
+  },
+  destinyMarker: {
+    backgroundColor: 'white',
+    borderRadius: 20,
+    padding: 5,
+    borderWidth: 1,
+    borderColor: 'red',
+  },
+  busStopMarker: {
+    backgroundColor: 'white',
+    borderRadius: 20,
+    padding: 5,
+    borderWidth: 1,
+    borderColor: '#1976D2',
+  },
+  metroStopMarker: {
+    backgroundColor: 'white',
+    borderRadius: 20,
+    padding: 5,
+    borderWidth: 1,
+    borderColor: '#FF5722',
   },
   speedLimitMarker: {
     backgroundColor: 'white',
@@ -164,7 +381,17 @@ const styles = StyleSheet.create({
   },
   speedLimitText: {
     fontWeight: 'bold',
-    fontSize: 12,
+    fontSize: 14,
+  },
+  schoolZoneMarker: {
+    backgroundColor: 'white',
+    borderRadius: 20,
+    padding: 5,
+    borderWidth: 1,
+    borderColor: '#FF9800',
+  },
+  markerText: {
+    fontSize: 20,
   },
 });
 
