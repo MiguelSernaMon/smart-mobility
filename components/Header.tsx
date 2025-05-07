@@ -20,29 +20,31 @@ const Header = ({
 }: HeaderProps) => {
   return (
     <View style={styles.header}>
-      <Text style={styles.title}>Rutas de Autobús</Text>
+      <Text style={styles.title}>Busca tu destino</Text>
+      
       <View style={styles.searchContainer}>
         <TextInput
           style={styles.searchInput}
-          placeholder="Buscar dirección de destino..."
+          placeholder="Ingresa una dirección"
           value={searchQuery}
-          onChangeText={setSearchQuery}
+          onChangeText={(text) => setSearchQuery(text)}
           onSubmitEditing={searchDestination}
         />
-        <TouchableOpacity
+        <TouchableOpacity 
           style={styles.searchAddressButton}
           onPress={searchDestination}
           disabled={searchLoading}
         >
           {searchLoading ? (
-            <ActivityIndicator size="small" color="#fff" />
+            <ActivityIndicator color="#fff" size="small" />
           ) : (
             <Text style={styles.buttonText}>Buscar</Text>
           )}
         </TouchableOpacity>
       </View>
-      <TouchableOpacity
-        style={styles.searchButton}
+      
+      <TouchableOpacity 
+        style={[styles.searchAddressButton, loading && styles.searchAddressButton]}
         onPress={fetchBusRoutes}
         disabled={loading}
       >

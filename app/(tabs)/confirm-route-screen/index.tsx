@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from "react";
 import * as Location from "expo-location";
-import { StyleSheet, View, Alert, StatusBar, Platform, SafeAreaView } from "react-native";
+import { StyleSheet, View, Alert, StatusBar, Platform, SafeAreaView, FlatList, TouchableOpacity, Text } from "react-native";
 import { router, useLocalSearchParams } from 'expo-router';
 
 import Header from "@/components/Header";
 import RouteMap from "@/components/RouteMap";
 import NoRoutesMessage from "@/components/NoRoutesMessage";
 import RouteActiveInfo from "@/components/RouteActiveInfo";
+import { Ionicons } from "@expo/vector-icons";
 
 export default function ConfirmRouteScreen() {
   const params = useLocalSearchParams();
@@ -20,6 +21,14 @@ export default function ConfirmRouteScreen() {
     latitude: 6.252565,
     longitude: -75.570568,
   });
+
+  const [loading, setLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchLoading, setSearchLoading] = useState(false);
+
+  // Nuevos estados para el autocompletado
+  const [predictions, setPredictions] = useState([]);
+  const [showPredictions, setShowPredictions] = useState(false);
 
   // Obtener la altura de la barra de estado al cargar el componente
   useEffect(() => {
@@ -62,10 +71,92 @@ export default function ConfirmRouteScreen() {
     }
   }, [params.selectedRouteId, params.polyline, params.routeDetails]);
 
-  const [loading, setLoading] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchLoading, setSearchLoading] = useState(false);
+ 
 
+  // Resto de tu código existente...
+
+  // Nueva función para buscar predicciones de lugares
+  const searchPlacePredictions = async (input) => {
+  if (!input || input.length < 3) {
+    setPredictions([]);
+    setShowPredictions(false);
+    return;
+  }
+
+  try {
+    console.log("Buscando predicciones para:", input);
+    const response = await fetch(
+      `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(
+        input
+      )}&components=country:co&location=${origin.latitude},${origin.longitude}&radius=50000&strictbounds=true&key=${
+        process.env.EXPO_PUBLIC_GOOGLE_MAPS_KEY
+      }`
+    );
+
+    const data = await response.json();
+    console.log("Respuesta de predicciones:", data);
+    
+    if (data.predictions && data.predictions.length > 0) {
+      console.log("Predicciones encontradas:", data.predictions.length);
+      setPredictions(data.predictions);
+      setShowPredictions(true);
+    } else {
+      console.log("No se encontraron predicciones");
+      setPredictions([]);
+      setShowPredictions(false);
+    }
+  } catch (error) {
+    console.error("Error buscando predicciones:", error);
+  }
+};
+
+  // Función actualizada para manejar cambios en el texto de búsqueda
+  const handleSearchTextChange = (text) => {
+    setSearchQuery(text);
+    searchPlacePredictions(text);
+  };
+  // Función para seleccionar una predicción
+  const selectPrediction = async (prediction) => {
+    try {
+      const response = await fetch(
+        `https://maps.googleapis.com/maps/api/place/details/json?place_id=${prediction.place_id}&fields=geometry,formatted_address&key=${
+          process.env.EXPO_PUBLIC_GOOGLE_MAPS_KEY
+        }`
+      );
+
+      const data = await response.json();
+      if (data.result && data.result.geometry && data.result.geometry.location) {
+        const location = data.result.geometry.location;
+        const newDestiny = {
+          latitude: location.lat,
+          longitude: location.lng
+        };
+        
+        setDestiny(newDestiny);
+        setSearchQuery(prediction.description);
+        setShowPredictions(false);
+        
+        if (mapRef.current) {
+          mapRef.current.fitToCoordinates(
+            [origin, newDestiny],
+            { edgePadding: { top: 100, right: 100, bottom: 100, left: 100 }, animated: true }
+          );
+        }
+        
+        Alert.alert(
+          "Destino establecido",
+          `Destino: ${data.result.formatted_address || prediction.description}`,
+          [
+            { text: "Buscar rutas", onPress: () => fetchBusRoutes(newDestiny) },
+            { text: "OK" }
+          ]
+        );
+      }
+    } catch (error) {
+      console.error("Error obteniendo detalles del lugar:", error);
+      Alert.alert("Error", "No se pudieron obtener los detalles del lugar seleccionado");
+    }
+  };
   const searchDestination = async () => {
     if (!searchQuery.trim()) {
       Alert.alert("Error", "Por favor ingresa una dirección de destino");
@@ -357,7 +448,7 @@ export default function ConfirmRouteScreen() {
 
   return (
     <>
-    <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
+   <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
     <SafeAreaView style={styles.container}>
       {/* Espacio para la barra de estado en Android */}
       {Platform.OS === 'android' && (
@@ -366,14 +457,43 @@ export default function ConfirmRouteScreen() {
       
       {/* Solo mostrar el header de búsqueda si no hay ruta activa */}
       {!activeRoute ? (
-        <Header 
-          searchQuery={searchQuery}
-          setSearchQuery={setSearchQuery}
-          searchDestination={searchDestination}
-          searchLoading={searchLoading}
-          fetchBusRoutes={() => fetchBusRoutes()}
-          loading={loading}
-        />
+        <>
+          <Header 
+            searchQuery={searchQuery}
+            setSearchQuery={handleSearchTextChange}
+            searchDestination={searchDestination}
+            searchLoading={searchLoading}
+            fetchBusRoutes={() => fetchBusRoutes()}
+            loading={loading}
+          />
+          
+          {/* Lista de predicciones */}
+          {showPredictions && predictions.length > 0 && (
+            <View style={styles.predictionsContainer}>
+              <FlatList
+                data={predictions}
+                keyExtractor={(item) => item.place_id}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={styles.predictionItem}
+                    onPress={() => selectPrediction(item)}
+                  >
+                    <Ionicons name="location" size={18} color="#666" style={styles.predictionIcon} />
+                    <View style={styles.predictionTextContainer}>
+                      <Text style={styles.predictionText} numberOfLines={1}>
+                        {item.structured_formatting?.main_text || item.description.split(',')[0]}
+                      </Text>
+                      <Text style={styles.predictionSecondaryText} numberOfLines={1}>
+                        {item.structured_formatting?.secondary_text || item.description}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                )}
+                style={styles.predictionsList}
+              />
+            </View>
+          )}
+        </>
       ) : (
         <RouteActiveInfo 
           route={activeRoute} 
@@ -390,14 +510,56 @@ export default function ConfirmRouteScreen() {
       />
       
       {/* Mostrar mensaje solo si no hay ruta activa ni está cargando */}
-      {!loading && !activeRoute && <NoRoutesMessage />}
+      {!loading && !activeRoute && !showPredictions && <NoRoutesMessage />}
     </SafeAreaView>
   </>
+
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  predictionsContainer: {
+    position: 'absolute',
+    top: Platform.OS === 'android' ? 60 + (StatusBar.currentHeight || 0) : 60,
+    left: 0,
+    right: 0,
+    zIndex: 1000,
+    backgroundColor: 'white',
+    borderRadius: 8,
+    margin: 10,
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    maxHeight: 200,
+  },
+  predictionsList: {
+    borderRadius: 8,
+  },
+  predictionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  predictionIcon: {
+    marginRight: 10,
+  },
+  predictionTextContainer: {
+    flex: 1,
+  },
+  predictionText: {
+    fontSize: 16,
+    color: '#333',
+  },
+  predictionSecondaryText: {
+    fontSize: 14,
+    color: '#777',
+    marginTop: 2,
   },
 });
