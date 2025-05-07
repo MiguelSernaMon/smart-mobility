@@ -5,7 +5,7 @@ const NoRoutesMessage = () => {
   return (
     <View style={styles.noRoutesContainer}>
       <Text style={styles.noRoutesText}>
-        Presiona "Buscar rutas de autobús" para ver opciones de transporte público.
+        Busca tu destino en la barra de busqueda.
       </Text>
     </View>
   );

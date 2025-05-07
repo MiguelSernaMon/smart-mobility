@@ -48,9 +48,6 @@ const Header = ({
         onPress={fetchBusRoutes}
         disabled={loading}
       >
-        <Text style={styles.buttonText}>
-          {loading ? 'Buscando rutas...' : 'Buscar rutas de autobús'}
-        </Text>
       </TouchableOpacity>
     </View>
   );

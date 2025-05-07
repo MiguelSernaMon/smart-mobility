@@ -29,7 +29,9 @@ export default function ConfirmRouteScreen() {
   // Nuevos estados para el autocompletado
   const [predictions, setPredictions] = useState([]);
   const [showPredictions, setShowPredictions] = useState(false);
-
+  const [searchTimer, setSearchTimer] = useState(null);
+  // Agregar este estado para el cache
+  const [predictionsCache, setPredictionsCache] = useState({});
   // Obtener la altura de la barra de estado al cargar el componente
   useEffect(() => {
     setStatusBarHeight(StatusBar.currentHeight || 0);
@@ -77,43 +79,83 @@ export default function ConfirmRouteScreen() {
 
   // Nueva función para buscar predicciones de lugares
   const searchPlacePredictions = async (input) => {
-  if (!input || input.length < 3) {
-    setPredictions([]);
-    setShowPredictions(false);
-    return;
-  }
-
-  try {
-    console.log("Buscando predicciones para:", input);
-    const response = await fetch(
-      `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(
-        input
-      )}&components=country:co&location=${origin.latitude},${origin.longitude}&radius=50000&strictbounds=true&key=${
-        process.env.EXPO_PUBLIC_GOOGLE_MAPS_KEY
-      }`
-    );
-
-    const data = await response.json();
-    console.log("Respuesta de predicciones:", data);
-    
-    if (data.predictions && data.predictions.length > 0) {
-      console.log("Predicciones encontradas:", data.predictions.length);
-      setPredictions(data.predictions);
-      setShowPredictions(true);
-    } else {
-      console.log("No se encontraron predicciones");
+    if (!input || input.length < 3) {
       setPredictions([]);
       setShowPredictions(false);
+      return;
     }
-  } catch (error) {
-    console.error("Error buscando predicciones:", error);
-  }
-};
+  
+    // Verificar si ya tenemos este término en cache
+    if (predictionsCache[input]) {
+      console.log("Usando resultados en caché para:", input);
+      setPredictions(predictionsCache[input]);
+      setShowPredictions(predictionsCache[input].length > 0);
+      return;
+    }
+    
+    try {
+      console.log("Buscando predicciones para:", input);
+      const response = await fetch(
+        `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(
+          input
+        )}&components=country:co&location=${origin.latitude},${origin.longitude}&radius=50000&strictbounds=true&key=${
+          process.env.EXPO_PUBLIC_GOOGLE_MAPS_KEY
+        }`
+      );
+    
+      const data = await response.json();
+      
+      if (data.status === 'REQUEST_DENIED') {
+        console.error("API no autorizada:", data.error_message);
+        return;
+      }
+      
+      if (data.predictions && data.predictions.length > 0) {
+        console.log("Predicciones encontradas:", data.predictions.length);
+        
+        // Guardar en cache
+        setPredictionsCache(prev => ({
+          ...prev,
+          [input]: data.predictions
+        }));
+        
+        setPredictions(data.predictions);
+        setShowPredictions(true);
+      } else {
+        console.log("No se encontraron predicciones");
+        
+        // Guardar también los resultados vacíos para evitar consultas repetidas
+        setPredictionsCache(prev => ({
+          ...prev,
+          [input]: []
+        }));
+        
+        setPredictions([]);
+        setShowPredictions(false);
+      }
+    } catch (error) {
+      console.error("Error buscando predicciones:", error);
+    }
+  };
 
   // Función actualizada para manejar cambios en el texto de búsqueda
   const handleSearchTextChange = (text) => {
     setSearchQuery(text);
-    searchPlacePredictions(text);
+    
+    // Cancelar cualquier solicitud previa pendiente
+    if (searchTimer) clearTimeout(searchTimer);
+    
+    // Solo realizar la búsqueda si hay suficientes caracteres y después de un retraso
+    if (text.length >= 3) {
+      const timer = setTimeout(() => {   // ← Aquí defines timer como una constante local
+        searchPlacePredictions(text);
+      }, 500); // Espera 500ms después de que el usuario deje de escribir
+      
+      setSearchTimer(timer);   // ← Pero necesitas usar esta variable fuera de este scope
+    } else {
+      setPredictions([]);
+      setShowPredictions(false);
+    }
   };
   // Función para seleccionar una predicción
   const selectPrediction = async (prediction) => {
@@ -523,7 +565,7 @@ const styles = StyleSheet.create({
   },
   predictionsContainer: {
     position: 'absolute',
-    top: Platform.OS === 'android' ? 60 + (StatusBar.currentHeight || 0) : 60,
+    top: Platform.OS === 'android' ? 90 + (StatusBar.currentHeight || 0) : 90,
     left: 0,
     right: 0,
     zIndex: 1000,
