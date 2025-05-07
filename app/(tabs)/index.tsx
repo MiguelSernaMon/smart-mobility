@@ -57,17 +57,19 @@ export default function HomeScreen() {
 
       <ParallaxScrollView
         headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
+        headerHeight={300}
         headerImage={
           <Image
-            source={require('@/assets/images/partial-react-logo.png')}
+            source={require('@/assets/images/hero.jpg')}
             style={styles.reactLogo}
+            resizeMode="cover"
           />
         }>
         <ThemedView style={styles.titleContainer}>
           <ThemedText type="title">Smart Mobility</ThemedText>
         </ThemedView>
         <ThemedView style={styles.stepContainer}>
-          <ThemedText type="subtitle">Destinos populares</ThemedText>
+          <ThemedText type="subtitle">Tus lugares preferidos</ThemedText>
           <PopularDestinations />
         </ThemedView>
         <ThemedView style={styles.stepContainer}>
@@ -142,7 +144,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: Platform.OS === 'ios' ? 4 : 12, // SafeAreaView ya proporciona margen en iOS
     paddingBottom: 12,
-    backgroundColor: '#A1CEDC',
+    backgroundColor: '#f1f1f1',
     zIndex: 1,
   },
   searchBar: {
@@ -196,12 +198,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
-    opacity: 0.7,
+    width: '100%',
+    height: '100%',
+
   },
   popularDestinations: {
     marginTop: 8,

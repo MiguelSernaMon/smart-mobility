@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, Image, Platform, View, FlatList, TouchableOpacity, Alert } from 'react-native';
+import { StyleSheet, Image, Platform, View, FlatList, TouchableOpacity, Alert, SafeAreaView } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 
 import { Collapsible } from '@/components/Collapsible';
@@ -10,12 +10,17 @@ import { ThemedView } from '@/components/ThemedView';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import RouteVerticalCard from '@/components/RouteVerticalCard';
 import RouteDetailsModal from '@/components/RouteDetailsModal';
+import { StatusBar } from 'react-native';
 
 export default function ExploreScreen() {
   const params = useLocalSearchParams();
   const [routes, setRoutes] = useState([]);
   const [selectedRoute, setSelectedRoute] = useState(null);
   const [showDetails, setShowDetails] = useState(false);
+  const [statusBarHeight, setStatusBarHeight] = useState(0);
+      useEffect(() => {
+        setStatusBarHeight(StatusBar.currentHeight || 0);
+      }, []);
 
   useEffect(() => {
     if (params.routes) {
@@ -35,6 +40,7 @@ export default function ExploreScreen() {
 
   const renderEmptyContent = () => (
     <>
+      
       <ThemedView style={styles.titleContainer}>
         <ThemedText type="title">Rutas de Transporte</ThemedText>
       </ThemedView>
@@ -59,54 +65,75 @@ export default function ExploreScreen() {
 
   if (routes.length === 0) {
     return (
-      <ParallaxScrollView
-        headerBackgroundColor={{ light: '#D0D0D0', dark: '#353636' }}
-        headerImage={
-          <IconSymbol
-            size={310}
-            color="#808080"
-            name="chevron.left.forwardslash.chevron.right"
-            style={styles.headerImage}
-          />
-        }>
-        {renderEmptyContent()}
-      </ParallaxScrollView>
+      <>
+        <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
+        <SafeAreaView style={styles.safeArea}>
+          {/* Añade un espacio para la barra de estado en Android */}
+          {Platform.OS === 'android' && (
+            <View style={{ height: statusBarHeight }} />
+          )}
+          
+          <ParallaxScrollView
+            headerBackgroundColor={{ light: '#D0D0D0', dark: '#353636' }}
+            headerImage={
+              <Image
+                source={require('@/assets/images/hero2.png')}
+                style={styles.headerImage}
+                resizeMode="cover"
+              />
+            }>
+            {renderEmptyContent()}
+          </ParallaxScrollView>
+        </SafeAreaView>
+      </>
     );
   }
   
   // Si hay rutas disponibles, mostrarlas en formato vertical
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <ThemedText type="title">Rutas disponibles</ThemedText>
-        <ThemedText>{routes.length} opciones encontradas</ThemedText>
-      </View>
-      
-      <FlatList
-        data={routes}
-        keyExtractor={(item) => item.id.toString()}
-        renderItem={({ item }) => (
-          <RouteVerticalCard
-            route={item}
-            onPress={() => handleRoutePress(item)}
-            isSelected={selectedRoute && selectedRoute.id === item.id}
+    <>
+      <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
+      <SafeAreaView style={styles.container}>
+        {/* Añade un espacio para la barra de estado en Android */}
+        {Platform.OS === 'android' && (
+          <View style={{ height: statusBarHeight }} />
+        )}
+        
+        <View style={styles.header}>
+          <ThemedText type="title">Rutas disponibles</ThemedText>
+          <ThemedText>{routes.length} opciones encontradas</ThemedText>
+        </View>
+        
+        <FlatList
+          data={routes}
+          keyExtractor={(item) => item.id.toString()}
+          renderItem={({ item }) => (
+            <RouteVerticalCard
+              route={item}
+              onPress={() => handleRoutePress(item)}
+              isSelected={selectedRoute && selectedRoute.id === item.id}
+            />
+          )}
+          contentContainerStyle={styles.routesList}
+        />
+        
+        {showDetails && selectedRoute && (
+          <RouteDetailsModal
+            route={selectedRoute}
+            visible={showDetails}
+            onClose={() => setShowDetails(false)}
           />
         )}
-        contentContainerStyle={styles.routesList}
-      />
-      
-      {showDetails && selectedRoute && (
-        <RouteDetailsModal
-          route={selectedRoute}
-          visible={showDetails}
-          onClose={() => setShowDetails(false)}
-        />
-      )}
-    </View>
+      </SafeAreaView>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#F5F5F5',
+  },
   container: {
     flex: 1,
     backgroundColor: '#F5F5F5',
@@ -123,10 +150,8 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   headerImage: {
-    color: '#808080',
-    bottom: -90,
-    left: -35,
-    position: 'absolute',
+    width: '100%',
+    height: '100%'
   },
   titleContainer: {
     flexDirection: 'row',
