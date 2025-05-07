@@ -119,7 +119,7 @@ const RouteDetailsModal = ({ route, visible, onClose }: RouteDetailsModalProps) 
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Detalles de la ruta</Text>
         </View>
-        
+        <ScrollView style={styles.scrollContainer} contentContainerStyle={styles.scrollContentContainer}>
         {/* Mapa con la ruta */}
         <View style={styles.mapContainer}>
           <MapView
@@ -313,7 +313,7 @@ const RouteDetailsModal = ({ route, visible, onClose }: RouteDetailsModalProps) 
           </View>
         </View>
         
-        <ScrollView style={styles.segmentsContainer}>
+        <View style={styles.segmentsContainer}>
           <Text style={styles.sectionTitle}>Instrucciones detalladas</Text>
           
           {route.segments && route.segments.map((segment, index) => (
@@ -342,6 +342,7 @@ const RouteDetailsModal = ({ route, visible, onClose }: RouteDetailsModalProps) 
           
           {/* Espacio para el botón de "ir a aplicación de navegación" */}
           <View style={{ height: 80 }} />
+        </View>
         </ScrollView>
         
         <View style={styles.navigationButtonContainer}>
@@ -362,6 +363,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F5F5F5',
+  },
+  scrollContainer: {
+    flex: 1,
   },
   header: {
     flexDirection: 'row',
@@ -453,7 +457,7 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   scheduleLineInner: {
-    position: 'absolute',
+    position: 'relative',
     top: 0,
     left: 0,
     right: 0,
@@ -471,7 +475,6 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   segmentsContainer: {
-    flex: 1,
     padding: 12,
   },
   sectionTitle: {
