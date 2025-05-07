@@ -14,6 +14,8 @@ const MAPPING = {
   'chevron.left.forwardslash.chevron.right': 'code',
   'chevron.right': 'chevron-right',
   'line.horizontal.3': 'menu',
+  'map.fill': 'map',
+  'location.fill': 'location-on',
 
 } as Partial<
   Record<

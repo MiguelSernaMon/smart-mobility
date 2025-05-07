@@ -36,7 +36,7 @@ export default function ExploreScreen() {
   const renderEmptyContent = () => (
     <>
       <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Explore</ThemedText>
+        <ThemedText type="title">Rutas de Transporte</ThemedText>
       </ThemedView>
       <ThemedText>No hay rutas disponibles. Busca un destino para ver rutas.</ThemedText>
       <Collapsible title="Opciones de transporte">
