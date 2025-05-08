@@ -60,7 +60,7 @@ export default function HomeScreen() {
         headerHeight={300}
         headerImage={
           <Image
-            source={require('@/assets/images/hero.jpg')}
+            source={require('@/assets/images/hero2.png')}
             style={styles.reactLogo}
             resizeMode="cover"
           />

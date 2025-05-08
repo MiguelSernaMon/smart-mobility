@@ -77,7 +77,7 @@ export default function ExploreScreen() {
             headerBackgroundColor={{ light: '#D0D0D0', dark: '#353636' }}
             headerImage={
               <Image
-                source={require('@/assets/images/hero2.png')}
+                source={require('@/assets/images/hero3.png')}
                 style={styles.headerImage}
                 resizeMode="cover"
               />
