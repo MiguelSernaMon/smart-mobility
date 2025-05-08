@@ -32,6 +32,8 @@ interface RouteMapProps {
   schoolZones?: SchoolZone[];
   activeRoutePolyline?: string;
   activeRoute?: any;
+  POIs?: any[];
+  onPOIPress?: (poi: any) => void;
 }
 
 const RouteMap = ({ 
@@ -42,7 +44,9 @@ const RouteMap = ({
   speedLimits = [],
   schoolZones = [],
   activeRoutePolyline = '',
-  activeRoute = null
+  activeRoute = null,
+  POIs  = [] , 
+  onPOIPress = () => {} 
 }: RouteMapProps) => {
   
   // Verificar si hay una ruta activa o seleccionada
@@ -121,6 +125,53 @@ const RouteMap = ({
     }
   }, [selectedRoute, activeRoutePolyline, origin, destiny]);
   
+  const getPOIColor = (type) => {
+    const colors = {
+      'restaurant': '#FF5722', // Naranja
+      'cafe': '#795548', // Marrón
+      'shopping_mall': '#9C27B0', // Púrpura
+      'tourist_attraction': '#4CAF50', // Verde
+      'museum': '#000000', // Azul
+      'pharmacy': '#F44336', // Rojo
+      'hospital': '#E91E63', // Rosa
+      // Nuevos colores para tipos relacionados con tráfico
+    'school': '#FFC107',     // Amarillo - para advertencia de zona escolar
+    'police': '#3F51B5',     // Azul oscuro - para policía
+    'gas_station': '#009688',// Verde azulado - para gasolineras
+    'parking': '#4CAF50',    // Verde - para estacionamientos
+    'bus_station': '#FF9800',// Naranja - para estaciones de bus
+    'subway_station': '#673AB7', // Morado - para metro
+    'transit_station': '#2196F3', // Azul - para transporte
+    'taxi_stand': '#FFEB3B', // Amarillo claro - para taxis
+    'car_repair': '#795548', // Marrón - para talleres
+    'traffic_control_point': '#F44336' // Rojo - para puntos de control
+    };
+    return colors[type] || '#607D8B'; // Gris por defecto
+  };
+  
+  const getPOIIcon = (type) => {
+    const icons = {
+      'restaurant': 'restaurant',
+      'cafe': 'cafe',
+      'shopping_mall': 'shopping',
+      'tourist_attraction': 'camera',
+      'museum': 'album',
+      'pharmacy': 'medkit',
+      'hospital': 'medical',
+      'school': 'school',
+      'police': 'shield',
+      'gas_station': 'car',
+      'parking': 'car',
+      'bus_station': 'bus',
+      'subway_station': 'subway',
+      'transit_station': 'train',
+      'taxi_stand': 'taxi',
+      'car_repair': 'construct',
+      'traffic_control_point': 'warning'
+    };
+    return icons[type] || 'location';
+  };
+
   return (
     <MapView 
       ref={mapRef}
@@ -156,6 +207,29 @@ const RouteMap = ({
           <Text style={styles.markerText}>🏁</Text>
         </View>
       </Marker>
+
+      {POIs.map((poi, index) => (
+        <Marker
+          key={`poi-${poi.place_id}-${index}`}
+          coordinate={{
+            latitude: poi.geometry.location.lat,
+            longitude: poi.geometry.location.lng
+          }}
+          title={poi.name}
+          description={poi.vicinity}
+          onCalloutPress={() => onPOIPress(poi)}
+        >
+          <View style={{ 
+            backgroundColor: getPOIColor(poi.placeType), 
+            padding: 5, 
+            borderRadius: 12,
+            borderWidth: 1,
+            borderColor: "#fff"
+          }}>
+            <Icon name={getPOIIcon(poi.placeType)} size={14} color="#fff" />
+          </View>
+        </Marker>
+      ))}
       
       {/* Dibujar segmentos de ruta con diferentes colores */}
       {selectedRoute && selectedRoute.segments && selectedRoute.segments.map((segment, idx) => {

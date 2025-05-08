@@ -32,7 +32,9 @@ export default function ConfirmRouteScreen() {
   const [searchTimer, setSearchTimer] = useState(null);
   // Agregar este estado para el cache
   const [predictionsCache, setPredictionsCache] = useState({});
-  // Obtener la altura de la barra de estado al cargar el componente
+  const [POIs, setPOIs] = useState([]);
+  const [showPOIs, setShowPOIs] = useState(false);
+  const [selectedPOITypes, setSelectedPOITypes] = useState(['restaurant', 'tourist_attraction']);
   useEffect(() => {
     setStatusBarHeight(StatusBar.currentHeight || 0);
   }, []);
@@ -70,12 +72,107 @@ export default function ConfirmRouteScreen() {
           console.error('Error parsing route details:', error);
         }
       }
+      setTimeout(() => {
+        fetchNearbyPOI(selectedPOITypes);
+      }, 1000);
     }
   }, [params.selectedRouteId, params.polyline, params.routeDetails]);
 
  
 
-  // Resto de tu código existente...
+  const fetchNearbyPOI = async (types = ['restaurant', 'cafe', 'shopping_mall', 'tourist_attraction']) => {
+    if (!activeRoute || !activeRoutePolyline) {
+      console.log("No hay ruta activa para buscar POI cercanos");
+      return;
+    }
+
+    try {
+      // Tomamos algunos puntos a lo largo de la ruta para buscar POI cerca de ellos
+      const bounds = getRouteBounds(activeRoute.segments);
+      const center = {
+        lat: (bounds.north + bounds.south) / 2,
+        lng: (bounds.east + bounds.west) / 2
+      };
+
+      // Calcular un radio aproximado que cubra la ruta
+      const radius = calculateRouteRadius(bounds);
+      
+      console.log(`Buscando POI cerca de (${center.lat}, ${center.lng}) con radio ${radius}m`);
+      
+      // Hacer la solicitud a la API para cada tipo de lugar
+      const allPOIs = [];
+      for (const type of types) {
+        const trafficRelated = ['school', 'police', 'hospital'].includes(type);
+    const rankByParam = trafficRelated ? '&rankby=prominence' : '';
+    
+    const response = await fetch(
+      `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${center.lat},${center.lng}&radius=${radius}&type=${type}${rankByParam}&key=${process.env.EXPO_PUBLIC_GOOGLE_MAPS_KEY}`
+    );
+        
+        const data = await response.json();
+        
+        if (data.status === 'OK' && data.results) {
+          console.log(`Encontrados ${data.results.length} lugares de tipo ${type}`);
+          
+          // Agregar el tipo al resultado para identificarlo en el mapa
+          const typedResults = data.results.map(place => ({
+            ...place,
+            placeType: type
+          }));
+          
+          allPOIs.push(...typedResults);
+        }
+      }
+      
+      setPOIs(allPOIs);
+      return allPOIs;
+    } catch (error) {
+      console.error('Error al buscar POI cercanos:', error);
+      return [];
+    }
+  };
+
+  // Función auxiliar para calcular los límites de la ruta
+  const getRouteBounds = (segments) => {
+    let north = -90, south = 90, east = -180, west = 180;
+    
+    segments.forEach(segment => {
+      if (segment.startLocation) {
+        north = Math.max(north, segment.startLocation.lat);
+        south = Math.min(south, segment.startLocation.lat);
+        east = Math.max(east, segment.startLocation.lng);
+        west = Math.min(west, segment.startLocation.lng);
+      }
+      
+      if (segment.endLocation) {
+        north = Math.max(north, segment.endLocation.lat);
+        south = Math.min(south, segment.endLocation.lat);
+        east = Math.max(east, segment.endLocation.lng);
+        west = Math.min(west, segment.endLocation.lng);
+      }
+    });
+    
+    return { north, south, east, west };
+  };
+
+  // Calcular un radio aproximado para la búsqueda
+  const calculateRouteRadius = (bounds) => {
+    // Calcular la distancia en metros entre los extremos
+    const R = 6371e3; // Radio de la Tierra en metros
+    const φ1 = bounds.south * Math.PI / 180;
+    const φ2 = bounds.north * Math.PI / 180;
+    const Δφ = (bounds.north - bounds.south) * Math.PI / 180;
+    const Δλ = (bounds.east - bounds.west) * Math.PI / 180;
+
+    const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+              Math.cos(φ1) * Math.cos(φ2) *
+              Math.sin(Δλ/2) * Math.sin(Δλ/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    const distance = R * c;
+
+    // Usar un radio que cubra bien el área de la ruta (mínimo 500m, máximo 2000m)
+    return Math.min(Math.max(distance / 2, 500), 2000);
+  };
 
   // Nueva función para buscar predicciones de lugares
   const searchPlacePredictions = async (input) => {
@@ -488,6 +585,57 @@ export default function ConfirmRouteScreen() {
     getLocationPermission();
   }, []);
 
+  const handlePOIPress = (poi) => {
+    Alert.alert(
+      poi.name,
+      `${poi.vicinity}\n\nCalificación: ${poi.rating || 'No disponible'}/5`,
+      [
+        {
+          text: "Ver detalles",
+          onPress: () => fetchPOIDetails(poi.place_id)
+        },
+        {
+          text: "Cerrar",
+          style: "cancel"
+        }
+      ]
+    );
+  };
+
+  // Obtener detalles adicionales del POI
+  const fetchPOIDetails = async (placeId) => {
+    try {
+      const response = await fetch(
+        `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=name,formatted_address,formatted_phone_number,website,opening_hours,photos,reviews&key=${process.env.EXPO_PUBLIC_GOOGLE_MAPS_KEY}`
+      );
+      
+      const data = await response.json();
+      
+      if (data.status === 'OK' && data.result) {
+        // Aquí podrías mostrar una modal o navegar a una pantalla con los detalles
+        Alert.alert(
+          data.result.name,
+          `Dirección: ${data.result.formatted_address}\nTeléfono: ${data.result.formatted_phone_number || 'No disponible'}\nWeb: ${data.result.website || 'No disponible'}`,
+          [
+            {
+              text: "Ir a este lugar",
+              onPress: () => {
+                // Aquí podrías implementar la navegación a este POI
+                Alert.alert("Funcionalidad en desarrollo", "Próximamente podrás navegar a este lugar");
+              }
+            },
+            {
+              text: "Cerrar",
+              style: "cancel"
+            }
+          ]
+        );
+      }
+    } catch (error) {
+      console.error('Error al obtener detalles del POI:', error);
+    }
+  };
+
   return (
     <>
    <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
@@ -549,6 +697,8 @@ export default function ConfirmRouteScreen() {
         setOrigin={setOrigin}
         destiny={destiny}
         activeRoutePolyline={activeRoutePolyline}
+        POIs={showPOIs ? POIs : []}
+        onPOIPress={(poi) => handlePOIPress(poi)}
       />
       
       {/* Mostrar mensaje solo si no hay ruta activa ni está cargando */}
