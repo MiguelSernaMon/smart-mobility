@@ -35,6 +35,39 @@ const RouteDetailsModal = ({ route, visible, onClose }: RouteDetailsModalProps) 
       longitude: point[1]
     }));
   };
+  // Actualizar la función normalizeTransportType para considerar vehicleType
+const normalizeTransportType = (type, vehicleType = null) => {
+  if (!type) return 'UNKNOWN';
+  
+  // Si es OTHER_TRANSIT y tiene vehicleType, usar ese valor
+  if (type.toUpperCase() === 'OTHER_TRANSIT' && vehicleType) {
+    const upperVehicleType = vehicleType.toUpperCase();
+    // Mapeo de vehicleType a nuestros tipos internos
+    const vehicleTypeMapping = {
+      'TRAM': 'TRANVIA',
+      'SUBWAY': 'METRO',
+      'TRAIN': 'METRO',
+      'RAIL': 'METRO'
+    };
+    return vehicleTypeMapping[upperVehicleType] || upperVehicleType;
+  }
+  
+  // Si no es OTHER_TRANSIT o no tiene vehicleType, usar el mapeo normal
+  const upperType = type.toUpperCase();
+  
+  // Mapeo de tipos de Google a nuestros tipos internos
+  const typeMapping = {
+    'SUBWAY': 'METRO',
+    'TRAM': 'TRANVIA',
+    'CABLE_CAR': 'CABLE',
+    'GONDOLA': 'CABLE',
+    'RAIL': 'METRO',
+    'OTHER_TRANSIT': 'TRANSIT'
+  };
+  
+  // Si existe un mapeo, usarlo. Si no, mantener el tipo original
+  return typeMapping[upperType] || upperType;
+};
   
   // Decodificar la polyline general para mostrar la ruta completa
   const decodedPoints = route.polyline 
@@ -44,11 +77,118 @@ const RouteDetailsModal = ({ route, visible, onClose }: RouteDetailsModalProps) 
   // Obtener origen y destino de la ruta
   const origin = decodedPoints.length > 0 ? decodedPoints[0] : null;
   const destination = decodedPoints.length > 0 ? decodedPoints[decodedPoints.length - 1] : null;
+   // Calcular el costo real de la ruta considerando integraciones
+  const calculateRealFare = () => {
+  if (!route.segments || route.segments.length === 0) {
+    return route.fare || "Precio no disponible";
+  }
   
+  // Tarifas base según el tipo de transporte
+  const baseFares = {
+  TRANSIT: 3600, // Metro/transporte público general
+  BUS: 2400,     // Autobús
+  SUBWAY: 3600,  // Metro
+  TRAM: 3600,    // Tranvía
+  RAIL: 3600,    // Tren
+  CABLE_CAR: 2800, // Teleférico/Cable
+  GONDOLA: 2800,   // Góndola/Cable aereo
+  WALKING: 0,      // Caminar
+  OTHER_TRANSIT: 3600, // Otros tipos de transporte público
+  // Mapeo a nuestros tipos personalizados para compatibilidad
+  METRO: 3600,
+  CABLE: 3600,
+  TRANVIA: 3600
+};
+  
+  // Función para normalizar el tipo de transporte
+  
+  
+  let totalFare = 0;
+  let lastTransportTime = null;
+  let lastTransportType = null;
+  let hasIntegration = false;
+  
+  try {
+    // Filtramos segmentos válidos (con tipo y departureTime definidos)
+    const validSegments = route.segments.filter(segment => 
+      segment && segment.type && segment.departureTime);
+    
+    if (validSegments.length === 0) {
+      console.log("No hay segmentos válidos para calcular la tarifa");
+      return route.fare || "$0";
+    }
+    
+    // Ordenamos los segmentos por tiempo de inicio
+    const sortedSegments = [...validSegments].sort((a, b) => {
+      const timeA = a.departureTime ? new Date(a.departureTime).getTime() : 0;
+      const timeB = b.departureTime ? new Date(b.departureTime).getTime() : 0;
+      return timeA - timeB;
+    });
+    
+    // Procesamos cada segmento para calcular la tarifa
+    sortedSegments.forEach((segment) => {
+      // Normalizar el tipo de transporte para manejar diferentes formatos
+      const transportType = normalizeTransportType(segment.type);
+      
+      if (transportType === 'WALKING' || transportType === 'UNKNOWN') return; // Caminar es gratis
+      
+      // Asegurarse de que el tipo de transporte es válido
+      if (!baseFares[transportType]) {
+        console.log(`Tipo de transporte desconocido: ${transportType} (original: ${segment.type})`);
+        return;
+      }
+      
+      const currentTime = segment.departureTime ? new Date(segment.departureTime).getTime() : 0;
+      
+      // Si hay un transporte previo
+      if (lastTransportTime !== null && lastTransportType !== null) {
+        const timeDiff = (currentTime - lastTransportTime) / (1000 * 60); // Diferencia en minutos
+        
+        // Si ha pasado menos de 60 minutos desde el último transporte y es una integración válida
+        if (timeDiff <= 60 && 
+            ((lastTransportType === 'METRO' && ['BUS', 'TRANVIA', 'CABLE'].includes(transportType)) || 
+             (lastTransportType === 'BUS' && ['METRO', 'TRANVIA', 'CABLE'].includes(transportType)) ||
+             (lastTransportType === 'TRANVIA' && ['METRO', 'BUS'].includes(transportType)) ||
+             (lastTransportType === 'CABLE' && ['METRO', 'BUS'].includes(transportType)))) {
+          // Aplicar descuento de integración (descuento fijo de 1000)
+          totalFare += baseFares[transportType] - 1000;
+          hasIntegration = true;
+        } else {
+          // Cobro completo
+          totalFare += baseFares[transportType];
+        }
+      } else {
+        // Primer transporte
+        totalFare += baseFares[transportType];
+      }
+      
+      // Actualizar tiempo y tipo del último transporte
+      lastTransportTime = currentTime;
+      lastTransportType = transportType;
+    });
+    
+    // Verificar que la tarifa sea válida
+    if (isNaN(totalFare) || totalFare < 0) {
+      console.log("Error: La tarifa calculada no es válida");
+      return route.fare || "$0";
+    }
+    
+    // Formato de la tarifa con separadores de miles
+    return `$${totalFare.toLocaleString('es-CO')}${hasIntegration ? ' (con integración)' : ''}`;
+  } catch (error) {
+    console.error("Error al calcular la tarifa:", error);
+    return route.fare || "$0";
+  }
+};
+  
+ 
   // Iniciar navegación con la ruta seleccionada
-  const startNavigation = () => {
+    const startNavigation = () => {
     // Cerrar el modal actual
     onClose();
+    
+    // Calcular la tarifa real con integración
+    const calculatedFare = calculateRealFare();
     
     // Navegar a la pantalla de confirmación de ruta con la información necesaria
     router.push({
@@ -66,7 +206,7 @@ const RouteDetailsModal = ({ route, visible, onClose }: RouteDetailsModalProps) 
           segments: JSON.stringify(route.segments),
           buses: route.buses,
           metro: route.metro,
-          fare: route.fare,
+          fare: calculatedFare, // Usar el valor calculado
           departureTime: route.departureTime,
           arrivalTime: route.arrivalTime
         })
@@ -286,15 +426,49 @@ const RouteDetailsModal = ({ route, visible, onClose }: RouteDetailsModalProps) 
             <View style={styles.summaryItem}>
               <Ionicons name="cash-outline" size={20} color="#1976D2" />
               <Text style={styles.summaryLabel}>Tarifa</Text>
-              <Text style={styles.summaryValue}>{route.fare}</Text>
+              <Text style={styles.summaryValue}>{calculateRealFare()}</Text>
             </View>
             <View style={styles.summaryItem}>
               <Ionicons name="swap-vertical-outline" size={20} color="#1976D2" />
               <Text style={styles.summaryLabel}>Trasbordos</Text>
               <Text style={styles.summaryValue}>
-                {route.buses && route.metro ? 
-                  route.buses.length + (route.metro.length || 0) - 1 : '0'}
-              </Text>
+  {(() => {
+    // Contamos cuántos tipos de transporte distintos hay en los segmentos
+    if (route.segments && route.segments.length > 0) {
+      // Filtramos segmentos de transporte (no caminatas) usando la función normalizeTransportType
+      const transportSegments = route.segments.filter(segment => {
+        if (!segment || !segment.type) return false;
+        
+        // Normalizar el tipo usando la misma función que usamos para la tarifa
+        // Consideramos vehicleType para OTHER_TRANSIT
+        const normalizedType = normalizeTransportType(
+          segment.type, 
+          segment.type === 'OTHER_TRANSIT' && segment.vehicleType ? segment.vehicleType : null
+        );
+        
+        return normalizedType !== 'WALKING' && normalizedType !== 'UNKNOWN';
+      });
+      
+      // Verificamos qué tipos de transporte tenemos (para debug)
+      console.log("Segmentos filtrados:", transportSegments.length);
+      console.log("Tipos de transporte:", transportSegments.map(s => {
+        const origType = s.type;
+        const vehicleType = s.type === 'OTHER_TRANSIT' && s.vehicleType ? s.vehicleType : 'N/A';
+        const normalizedType = normalizeTransportType(origType, vehicleType);
+        return `${origType} (${vehicleType}) → ${normalizedType}`;
+      }));
+      
+      // Si no hay segmentos de transporte, no hay trasbordos
+      if (transportSegments.length === 0) return '0';
+      
+      // El número de trasbordos es el número de segmentos de transporte menos 1
+      // (pero nunca menos que 0)
+      const transfers = Math.max(0, transportSegments.length - 1);
+      return transfers.toString();
+    }
+    return '0';
+  })()}
+</Text>
             </View>
           </View>
           
