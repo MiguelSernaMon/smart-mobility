@@ -7,6 +7,7 @@ import Header from "@/components/Header";
 import RouteMap from "@/components/RouteMap";
 import NoRoutesMessage from "@/components/NoRoutesMessage";
 import RouteActiveInfo from "@/components/RouteActiveInfo";
+import WeatherAlert from "@/components/WeatherAlert";
 import { Ionicons } from "@expo/vector-icons";
 
 export default function ConfirmRouteScreen() {
@@ -644,7 +645,7 @@ export default function ConfirmRouteScreen() {
       {Platform.OS === 'android' && (
         <View style={{ height: statusBarHeight }} />
       )}
-      
+      <WeatherAlert />
       {/* Solo mostrar el header de búsqueda si no hay ruta activa */}
       {!activeRoute ? (
         <>
