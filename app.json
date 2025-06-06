@@ -34,7 +34,13 @@
           "backgroundColor": "#ffffff"
         }
       ],
-      "@maplibre/maplibre-react-native"
+      "@maplibre/maplibre-react-native",
+      [
+        "expo-secure-store",
+        {
+          "faceIDPermission": "Permitir que Smart Mobility use Face ID para autenticación"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

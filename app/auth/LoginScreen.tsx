@@ -1,32 +1,52 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, Image, ActivityIndicator, Platform, SafeAreaView } from 'react-native';
+import { 
+  StyleSheet, 
+  View, 
+  Text, 
+  TouchableOpacity, 
+  Image, 
+  ActivityIndicator, 
+  Platform, 
+  SafeAreaView,
+  TextInput
+} from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import Constants from 'expo-constants';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function LoginScreen() {
   const { login, testLogin, isLoading } = useAuth();
-  // Antes de definir AuthProvider, añade esto:
   const router = useRouter();
   const [isDev] = useState(__DEV__);
+  
+  // Estados para formulario
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
-  const handleGoogleLogin = async () => {
-    try {
-      await login();
-      // El redireccionamiento se maneja en el AuthContext
-    } catch (error) {
-      console.error('Error durante el login:', error);
+  const handleLogin = async () => {
+    if (!email || !password) {
+      alert('Por favor introduce email y contraseña');
+      return;
+    }
+    
+    const success = await login(email, password);
+    if (success) {
+      router.replace('/(tabs)');
     }
   };
 
   const handleTestLogin = async () => {
-    try {
-      await testLogin();
+    const success = await testLogin();
+    if (success) {
       router.replace('/(tabs)');
-    } catch (error) {
-      console.error('Error durante el login de prueba:', error);
     }
+  };
+
+  const handleRegister = () => {
+    router.push('/auth/RegisterScreen');
   };
 
   const handleSkip = () => {
@@ -48,25 +68,58 @@ export default function LoginScreen() {
       </View>
 
       <View style={styles.formContainer}>
+        <View style={styles.inputContainer}>
+          <Ionicons name="mail" size={22} color="#666" style={styles.inputIcon} />
+          <TextInput
+            style={styles.input}
+            placeholder="Correo electrónico"
+            keyboardType="email-address"
+            autoCapitalize="none"
+            value={email}
+            onChangeText={setEmail}
+          />
+        </View>
+        
+        <View style={styles.inputContainer}>
+          <Ionicons name="lock-closed" size={22} color="#666" style={styles.inputIcon} />
+          <TextInput
+            style={styles.input}
+            placeholder="Contraseña"
+            secureTextEntry={!showPassword}
+            value={password}
+            onChangeText={setPassword}
+          />
+          <TouchableOpacity 
+            style={styles.eyeIcon}
+            onPress={() => setShowPassword(!showPassword)}
+          >
+            <Ionicons name={showPassword ? "eye-off" : "eye"} size={22} color="#666" />
+          </TouchableOpacity>
+        </View>
+
         <TouchableOpacity 
-          style={styles.googleButton}
-          onPress={handleGoogleLogin}
+          style={styles.loginButton}
+          onPress={handleLogin}
           disabled={isLoading}
         >
-          <Image 
-            source={require('@/assets/images/google-logo.png')} 
-            style={styles.buttonIcon}
-          />
-          <Text style={styles.buttonText}>Continuar con Google</Text>
+          <Text style={styles.loginButtonText}>Iniciar sesión</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={styles.registerButton}
+          onPress={handleRegister}
+          disabled={isLoading}
+        >
+          <Text style={styles.registerButtonText}>Registrarme</Text>
         </TouchableOpacity>
 
         {isDev && (
           <TouchableOpacity 
-            style={[styles.googleButton, styles.testButton]}
+            style={[styles.testButton]}
             onPress={handleTestLogin}
             disabled={isLoading}
           >
-            <Text style={styles.buttonText}>Login de prueba (solo dev)</Text>
+            <Text style={styles.testButtonText}>Login de prueba (solo dev)</Text>
           </TouchableOpacity>
         )}
 
@@ -115,28 +168,60 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
     textAlign: 'center',
-    marginBottom: 24,
   },
   formContainer: {
-    paddingHorizontal: 32,
-    paddingBottom: 40,
-  },
-  googleButton: {
-    flexDirection: 'row',
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    padding: 16,
-    alignItems: 'center',
+    flex: 1,
+    padding: 20,
     justifyContent: 'center',
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
   },
-  testButton: {
-    backgroundColor: '#E3F2FD',
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF',
+    borderRadius: 8,
+    marginBottom: 16,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    height: 55,
+  },
+  inputIcon: {
+    marginRight: 10,
+  },
+  eyeIcon: {
+    padding: 8,
+  },
+  input: {
+    flex: 1,
+    height: 50,
+    fontSize: 16,
+    color: '#333',
+  },
+  loginButton: {
+    backgroundColor: '#1976D2',
+    paddingVertical: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  loginButtonText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  registerButton: {
+    backgroundColor: '#FFF',
+    paddingVertical: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#1976D2',
+  },
+  registerButtonText: {
+    color: '#1976D2',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   buttonIcon: {
     width: 24,
@@ -145,22 +230,32 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     fontSize: 16,
-    fontWeight: '600',
     color: '#333',
+  },
+  testButton: {
+    backgroundColor: '#FFC107',
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  testButtonText: {
+    color: '#333',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   skipButton: {
     alignItems: 'center',
-    padding: 16,
+    padding: 10,
   },
   skipText: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#666',
-    textDecorationLine: 'underline',
   },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(255, 255, 255, 0.7)',
-    alignItems: 'center',
     justifyContent: 'center',
+    alignItems: 'center',
   },
 });

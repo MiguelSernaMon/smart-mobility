@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, SafeAreaView, ScrollView, Image, TouchableOpacity, ActivityIndicator, StatusBar, Platform, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -8,13 +8,16 @@ import { ThemedText } from '@/components/ThemedText';
 import { useAuth } from '@/context/AuthContext';
 
 export default function ProfileScreen() {
-  const { user, isLoading, isAuthenticated, logout, testLogin } = useAuth();
+  const { user, isLoading, isAuthenticated, logout } = useAuth();
   const [statusBarHeight, setStatusBarHeight] = useState(StatusBar.currentHeight || 0);
+
+  useEffect(() => {
+    setStatusBarHeight(StatusBar.currentHeight || 0);
+  }, []);
 
   const handleLogout = async () => {
     try {
       await logout();
-      // Opcionalmente redirigir a la pantalla principal
       router.replace('/');
     } catch (error) {
       console.error('Error al cerrar sesión:', error);
@@ -22,32 +25,7 @@ export default function ProfileScreen() {
   };
 
   const handleLogin = async () => {
-    if (__DEV__) {
-      // En desarrollo, mostrar opciones para elegir entre login real o de prueba
-      Alert.alert(
-        'Iniciar sesión',
-        'Selecciona el tipo de inicio de sesión',
-        [
-          {
-            text: 'Login con Google',
-            onPress: () => router.push('/auth/LoginScreen')
-          },
-          {
-            text: 'Login de prueba',
-            onPress: async () => {
-              await testLogin();
-            }
-          },
-          {
-            text: 'Cancelar',
-            style: 'cancel'
-          }
-        ]
-      );
-    } else {
-      // En producción, ir directamente a la pantalla de login
-      router.push('/auth/LoginScreen');
-    }
+    router.push('/auth/LoginScreen');
   };
 
   return (
@@ -189,7 +167,10 @@ export default function ProfileScreen() {
                   <Ionicons name="chevron-forward" size={20} color="#999" />
                 </TouchableOpacity>
                 
-                <TouchableOpacity style={styles.menuItem}>
+                <TouchableOpacity 
+                  style={styles.menuItem}
+                  onPress={() => router.push('/(tabs)/about-us')}
+                >
                   <Ionicons name="information-circle" size={24} color="#1976D2" />
                   <ThemedText style={styles.menuItemText}>Acerca de</ThemedText>
                   <Ionicons name="chevron-forward" size={20} color="#999" />
@@ -197,7 +178,7 @@ export default function ProfileScreen() {
               </View>
 
               <View style={styles.footer}>
-                <ThemedText style={styles.versionText}>Smart Mobility v1.0.0</ThemedText>
+                <ThemedText style={styles.version}>Versión 1.0.0</ThemedText>
               </View>
             </>
           )}
@@ -238,57 +219,75 @@ const styles = StyleSheet.create({
     borderRadius: 48,
   },
   userName: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: 'bold',
     color: 'white',
     marginBottom: 4,
   },
   userEmail: {
-    fontSize: 16,
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.8)',
+  },
+  notLoggedInContainer: {
+    alignItems: 'center',
+    padding: 20,
+  },
+  notLoggedInText: {
+    fontSize: 18,
     color: 'white',
-    opacity: 0.9,
+    marginTop: 8,
   },
   content: {
     flex: 1,
-    paddingTop: 16,
+    paddingTop: 20,
+  },
+  loadingContainer: {
+    flex: 1,
+    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingText: {
+    marginTop: 10,
+    color: '#666',
   },
   statsContainer: {
     flexDirection: 'row',
     backgroundColor: 'white',
     borderRadius: 12,
     marginHorizontal: 16,
-    marginTop: -20,
+    marginBottom: 20,
     paddingVertical: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowRadius: 2,
+    elevation: 2,
   },
   statItem: {
     flex: 1,
     alignItems: 'center',
   },
   statValue: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#1976D2',
   },
   statLabel: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#666',
     marginTop: 4,
   },
   separator: {
     width: 1,
-    height: '70%',
     backgroundColor: '#e0e0e0',
+    height: '100%',
   },
   section: {
     backgroundColor: 'white',
     borderRadius: 12,
     marginHorizontal: 16,
-    marginTop: 16,
+    marginBottom: 20,
     padding: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
@@ -311,20 +310,53 @@ const styles = StyleSheet.create({
   },
   menuItemText: {
     flex: 1,
+    marginLeft: 16,
     fontSize: 16,
-    marginLeft: 12,
     color: '#333',
+  },
+  notLoggedInSection: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    marginHorizontal: 16,
+    marginBottom: 20,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+    alignItems: 'center',
+  },
+  notLoggedInDescription: {
+    textAlign: 'center',
+    marginBottom: 20,
+    lineHeight: 22,
+    color: '#666',
+  },
+  loginButton: {
+    flexDirection: 'row',
+    backgroundColor: '#1976D2',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loginButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginLeft: 8,
   },
   logoutButton: {
     flexDirection: 'row',
-    backgroundColor: '#D32F2F',
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 16,
+    backgroundColor: '#F44336',
     marginHorizontal: 16,
-    marginTop: 24,
-    marginBottom: 8,
+    marginBottom: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   logoutButtonText: {
     color: 'white',
@@ -334,67 +366,10 @@ const styles = StyleSheet.create({
   },
   footer: {
     alignItems: 'center',
-    marginTop: 24,
-    marginBottom: 32,
-  },
-  versionText: {
-    fontSize: 14,
-    color: '#999',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#666',
-  },
-  notLoggedInContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 20,
-  },
-  notLoggedInText: {
-    fontSize: 18,
-    color: 'white',
-    marginTop: 12,
-  },
-  notLoggedInSection: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    marginHorizontal: 16,
     marginVertical: 20,
-    padding: 24,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
   },
-  notLoggedInDescription: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: 24,
-    lineHeight: 22,
-  },
-  loginButton: {
-    flexDirection: 'row',
-    backgroundColor: '#1976D2',
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 16,
-    width: '100%',
-  },
-  loginButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginLeft: 8,
+  version: {
+    color: '#999',
+    fontSize: 14,
   },
 });

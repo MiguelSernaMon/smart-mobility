@@ -1,7 +1,7 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import { Alert, Platform } from 'react-native';
-import * as WebBrowser from 'expo-web-browser';
-import Constants from 'expo-constants';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { router } from 'expo-router';
 
 // Definir la interfaz del usuario
 export interface User {
@@ -16,39 +16,40 @@ export interface User {
 // Definir el contexto de autenticación
 interface AuthContextType {
   user: User | null;
+  token: string | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  login: () => Promise<void>;
-  testLogin: () => Promise<void>;
+  login: (email: string, password: string) => Promise<boolean>;
+  register: (name: string, email: string, password: string) => Promise<boolean>;
+  testLogin: () => Promise<boolean>;
   logout: () => Promise<void>;
   checkAuthStatus: () => Promise<boolean>;
 }
 
-// Crear el contexto
-export const AuthContext = createContext<AuthContextType>({
-  user: null,
-  isLoading: true,
-  isAuthenticated: false,
-  login: async () => {},
-  testLogin: async () => {},
-  logout: async () => {},
-  checkAuthStatus: async () => false,
-});
-
-// URL base del API directamente hardcodeada para debugging
-// Usa 10.0.2.2 para emuladores Android, localhost para iOS y tu IP real para dispositivos físicos
+// URL base del API
 const API_BASE_URL = Platform.select({
   android: 'http://10.0.2.2:3000/api', // Para emulador Android
   ios: 'http://localhost:3000/api',     // Para emulador iOS
   default: 'http://192.168.1.100:3000/api' // Cambia esto a tu IP real para dispositivos físicos
 });
 
-// Muestra la URL base en consola para debugging
-console.log('🚀 API Base URL:', API_BASE_URL);
+// Crear el contexto
+export const AuthContext = createContext<AuthContextType>({
+  user: null,
+  token: null,
+  isLoading: true,
+  isAuthenticated: false,
+  login: async () => false,
+  register: async () => false,
+  testLogin: async () => false,
+  logout: async () => {},
+  checkAuthStatus: async () => false,
+});
 
 // Proveedor del contexto
 export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   // Verificar estado de autenticación al cargar
@@ -56,150 +57,190 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
     checkAuthStatus();
   }, []);
 
+  // Guardar token en AsyncStorage
+  const saveToken = async (newToken: string) => {
+    try {
+      await AsyncStorage.setItem('authToken', newToken);
+      setToken(newToken);
+    } catch (error) {
+      console.error('Error guardando token:', error);
+    }
+  };
+
+  // Borrar token de AsyncStorage
+  const removeToken = async () => {
+    try {
+      await AsyncStorage.removeItem('authToken');
+      setToken(null);
+    } catch (error) {
+      console.error('Error eliminando token:', error);
+    }
+  };
+
   // Verificar si el usuario está autenticado
   const checkAuthStatus = async (): Promise<boolean> => {
     try {
       setIsLoading(true);
       
-      console.log('🔍 Verificando estado de autenticación...');
+      // Obtener token guardado
+      const savedToken = await AsyncStorage.getItem('authToken');
       
-      const response = await fetch(`${API_BASE_URL}/auth/check`, {
+      if (!savedToken) {
+        console.log('No hay token guardado');
+        setUser(null);
+        setIsLoading(false);
+        return false;
+      }
+      
+      // Verificar token con el servidor
+      const response = await fetch(`${API_BASE_URL}/auth/verify`, {
         method: 'GET',
-        credentials: 'include',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${savedToken}`
+        },
+      });
+      
+      const data = await response.json();
+      
+      if (data.success && data.user) {
+        console.log('Usuario autenticado:', data.user);
+        setUser(data.user);
+        setToken(savedToken);
+        setIsLoading(false);
+        return true;
+      } else {
+        console.log('Token inválido o expirado');
+        await removeToken();
+        setUser(null);
+        setIsLoading(false);
+        return false;
+      }
+    } catch (error: any) {
+      console.error('Error verificando autenticación:', error);
+      setUser(null);
+      setIsLoading(false);
+      return false;
+    }
+  };
+
+  // Login con email y contraseña
+  const login = async (email: string, password: string): Promise<boolean> => {
+    try {
+      setIsLoading(true);
+      
+      const response = await fetch(`${API_BASE_URL}/auth/login`, {
+        method: 'POST',
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json',
         },
+        body: JSON.stringify({ email, password })
       });
-
-      console.log('✅ Respuesta recibida:', response.status);
       
       const data = await response.json();
-      console.log('📄 Datos recibidos:', data);
       
-      if (data.success && data.authenticated) {
-        console.log('👤 Usuario autenticado:', data.user);
+      if (data.success && data.token) {
+        await saveToken(data.token);
         setUser(data.user);
         return true;
       } else {
-        console.log('❌ Usuario no autenticado');
-        setUser(null);
+        Alert.alert('Error', data.message || 'Credenciales inválidas');
         return false;
       }
     } catch (error: any) {
-      console.error('❌ Error verificando autenticación:', error);
-      console.error('Mensaje:', error.message);
-      // Si hay un error de red, podría ser un problema de conexión o CORS
-      if (error.message.includes('Network request failed')) {
-        console.log('🌐 Posible error de red o CORS. Verifica que:');
-        console.log('1. El servidor esté ejecutándose en ' + API_BASE_URL);
-        console.log('2. CORS esté configurado correctamente en el servidor');
-        console.log('3. Si estás en un dispositivo físico, la IP sea accesible');
-      }
-      
-      setUser(null);
+      console.error('Error en login:', error);
+      Alert.alert('Error', 'Ocurrió un error al intentar iniciar sesión');
       return false;
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Función para iniciar sesión con Google
-  const login = async () => {
+  // Registro de nuevo usuario
+  const register = async (name: string, email: string, password: string): Promise<boolean> => {
     try {
       setIsLoading(true);
       
-      console.log('🔑 Iniciando sesión con Google...');
+      console.log(`Intentando conectar a: ${API_BASE_URL}/auth/register`);
       
-      // Abrimos el navegador con la URL de autenticación de Google
-      const result = await WebBrowser.openAuthSessionAsync(
-        `${API_BASE_URL}/auth/google`,
-        // Usar una URL de retorno fija para depuración
-        'exp://'
-      );
-      
-      console.log('🔄 Respuesta del navegador:', result.type);
-      
-      if (result.type === 'success') {
-        console.log('✅ Navegación exitosa, verificando autenticación...');
-        await checkAuthStatus();
-      } else {
-        console.log('❌ Error en la navegación:', result);
-        Alert.alert('Error', 'No se pudo iniciar sesión con Google');
-      }
-    } catch (error: any) {
-      console.error('❌ Error en inicio de sesión:', error);
-      console.error('Mensaje:', error.message);
-      Alert.alert('Error', 'Ocurrió un error al intentar iniciar sesión');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Login de prueba (solo para desarrollo)
-  const testLogin = async () => {
-    try {
-      setIsLoading(true);
-      console.log('🧪 Ejecutando login de prueba...');
-      
-      const response = await fetch(`${API_BASE_URL}/auth/test-login`, {
+      const response = await fetch(`${API_BASE_URL}/auth/register`, {
         method: 'POST',
-        credentials: 'include',
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json',
         },
+        body: JSON.stringify({ name, email, password })
       });
-
-      console.log('✅ Respuesta de test-login:', response.status);
-      const data = await response.json();
-      console.log('📄 Datos recibidos:', data);
       
-      if (data.success) {
-        console.log('👤 Usuario de prueba:', data.user);
+      const data = await response.json();
+      console.log('Respuesta del servidor:', data);
+      
+      if (data.success && data.token) {
+        await saveToken(data.token);
         setUser(data.user);
+        return true;
       } else {
-        console.log('❌ Error en login de prueba:', data.message);
-        Alert.alert('Error', data.message || 'Error en inicio de sesión de prueba');
+        Alert.alert('Error', data.message || 'No se pudo registrar el usuario');
+        return false;
       }
     } catch (error: any) {
-      console.error('❌ Error en login de prueba:', error);
+      console.error('Error en registro (detallado):', error);
+      console.error('Tipo de error:', typeof error);
       console.error('Mensaje:', error.message);
+      console.error('Stack:', error.stack);
+      
+      Alert.alert(
+        'Error de conexión', 
+        'No se pudo conectar al servidor. Verifica tu conexión y que el servidor esté activo.'
+      );
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  // Login de prueba (solo para desarrollo)
+  const testLogin = async (): Promise<boolean> => {
+    try {
+      setIsLoading(true);
+      
+      const response = await fetch(`${API_BASE_URL}/auth/test-account`, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        }
+      });
+      
+      const data = await response.json();
+      
+      if (data.success && data.token) {
+        await saveToken(data.token);
+        setUser(data.user);
+        return true;
+      } else {
+        Alert.alert('Error', data.message || 'Error en inicio de sesión de prueba');
+        return false;
+      }
+    } catch (error: any) {
+      console.error('Error en login de prueba:', error);
       Alert.alert('Error', 'Ocurrió un error al intentar el login de prueba');
+      return false;
     } finally {
       setIsLoading(false);
     }
   };
 
   // Cerrar sesión
-  const logout = async () => {
+  const logout = async (): Promise<void> => {
     try {
       setIsLoading(true);
-      console.log('🚪 Cerrando sesión...');
-      
-      const response = await fetch(`${API_BASE_URL}/auth/logout`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
-      });
-
-      console.log('✅ Respuesta de logout:', response.status);
-      const data = await response.json();
-      console.log('📄 Datos recibidos:', data);
-      
-      if (data.success) {
-        console.log('👋 Sesión cerrada exitosamente');
-        setUser(null);
-      } else {
-        console.log('❌ Error al cerrar sesión:', data.message);
-        Alert.alert('Error', 'No se pudo cerrar sesión');
-      }
+      await removeToken();
+      setUser(null);
     } catch (error: any) {
-      console.error('❌ Error al cerrar sesión:', error);
-      console.error('Mensaje:', error.message);
+      console.error('Error al cerrar sesión:', error);
       Alert.alert('Error', 'Ocurrió un error al intentar cerrar sesión');
     } finally {
       setIsLoading(false);
@@ -211,9 +252,11 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
     <AuthContext.Provider 
       value={{ 
         user, 
+        token,
         isLoading, 
         isAuthenticated: !!user, 
         login, 
+        register,
         testLogin, 
         logout,
         checkAuthStatus
