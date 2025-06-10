@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from 'react';
+import { useLocalSearchParams } from 'expo-router';
 import * as Location from "expo-location";
 import { StyleSheet, View, Alert, StatusBar, Platform, SafeAreaView, FlatList, TouchableOpacity, Text } from "react-native";
-import { router, useLocalSearchParams } from 'expo-router';
+import { router } from 'expo-router';
 
 import Header from "@/components/Header";
 import RouteMap from "@/components/RouteMap";
@@ -13,6 +14,69 @@ import { saveDestination } from '@/utils/destinationStorage';
 
 export default function ConfirmRouteScreen() {
   const params = useLocalSearchParams();
+  
+  // Verificar si tenemos parámetros de destino
+  const hasDestinyParams = !!(params.destinationLat && params.destinationLng);
+  
+  // Inicializar destino con parámetros o valores predeterminados
+  const [destiny, setDestiny] = useState({
+    latitude: hasDestinyParams 
+      ? parseFloat(params.destinationLat as string) 
+      : 6.296242626909633,
+    longitude: hasDestinyParams 
+      ? parseFloat(params.destinationLng as string) 
+      : -75.57194844226433
+  });
+  
+  // Inicializar searchQuery con el parámetro destinationName si está disponible
+  const [searchQuery, setSearchQuery] = useState(
+    params.destinationName 
+      ? params.destinationName as string 
+      : params.searchQuery as string || ''
+  );
+  
+  // Si recibimos un searchQuery directo y no hay destinationName, buscar automáticamente
+  useEffect(() => {
+    if (params.searchQuery && !params.destinationName && !hasDestinyParams) {
+      const query = params.searchQuery as string;
+      if (query.length > 3) {
+        setSearchQuery(query);
+        // Pequeño retraso para asegurar que la UI esté lista
+        const timer = setTimeout(() => {
+          searchDestination();
+        }, 500);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [params.searchQuery]);
+  
+  // Si hay parámetros de destino, ajustar el mapa para mostrar origen y destino
+  useEffect(() => {
+    if (hasDestinyParams && mapRef.current) {
+      // Corto retraso para asegurar que el mapa esté listo
+      const timer = setTimeout(() => {
+        try {
+          if (mapRef.current) {
+            mapRef.current.fitToCoordinates(
+              [origin, destiny],
+              { edgePadding: { top: 100, right: 100, bottom: 100, left: 100 }, animated: true }
+            );
+          }
+          
+          // Si tenemos un destinationId, mostrar opciones para buscar rutas
+          if (params.destinationId) {
+            setPrepareRequest(true);
+            // Opcional: Mostrar una mini tarjeta o botón flotante para buscar rutas
+          }
+        } catch (error) {
+          console.error("Error ajustando mapa:", error);
+        }
+      }, 500);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [hasDestinyParams]);
+  
   const mapRef = React.useRef(null);
   const [statusBarHeight, setStatusBarHeight] = useState(0);
 
@@ -25,7 +89,6 @@ export default function ConfirmRouteScreen() {
   });
 
   const [loading, setLoading] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
   const [searchLoading, setSearchLoading] = useState(false);
 
   // Nuevos estados para el autocompletado
@@ -40,11 +103,6 @@ export default function ConfirmRouteScreen() {
   useEffect(() => {
     setStatusBarHeight(StatusBar.currentHeight || 0);
   }, []);
-
-  const [destiny, setDestiny] = useState({
-    latitude: 6.296242626909633, 
-    longitude: -75.57194844226433
-  });
 
   useEffect(() => {
     if (params.selectedRouteId && params.polyline) {

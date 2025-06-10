@@ -123,3 +123,39 @@ export const getRecentDestinations = async (limit: number = 3): Promise<Destinat
     return [];
   }
 };
+
+// Agregar nueva función para usar un destino (incrementa el contador pero no añade nuevo)
+export const useDestination = async (destinationId: string): Promise<Destination | null> => {
+  try {
+    // Obtener destinos existentes
+    const destinations = await getDestinations();
+    
+    // Buscar el destino por ID
+    const destinationIndex = destinations.findIndex(dest => dest.id === destinationId);
+    
+    if (destinationIndex === -1) {
+      console.error('Destino no encontrado:', destinationId);
+      return null;
+    }
+    
+    // Actualizar contador y fecha de último uso
+    const now = Date.now();
+    destinations[destinationIndex] = {
+      ...destinations[destinationIndex],
+      count: (destinations[destinationIndex].count || 0) + 1,
+      lastUsed: now
+    };
+    
+    // Guardar la lista actualizada
+    await AsyncStorage.setItem(DESTINATIONS_STORAGE_KEY, JSON.stringify(destinations));
+    
+    // Emitir evento de actualización
+    emitEvent('destinationUpdate');
+    
+    // Retornar el destino actualizado
+    return destinations[destinationIndex];
+  } catch (error) {
+    console.error('Error al usar destino:', error);
+    return null;
+  }
+};

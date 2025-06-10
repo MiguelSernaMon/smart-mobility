@@ -3,6 +3,7 @@ import { StyleSheet, Text, View, Platform } from "react-native";
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from "react-native-maps";
 import MapViewDirections from "react-native-maps-directions";
 import { decode } from "@mapbox/polyline";
+import Ionicons from 'react-native-vector-icons/Ionicons';
 
 interface SpeedLimit {
   id: string;
@@ -198,13 +199,14 @@ const RouteMap = ({
       </Marker>
       
       {/* Marcador de destino */}
-      <Marker 
-        coordinate={destiny} 
-        title="Destino" 
+      <Marker
+        coordinate={destiny}
+        title="Destino"
         description="Este es tu destino"
+        pinColor="blue"
       >
         <View style={styles.destinyMarker}>
-          <Text style={styles.markerText}>🏁</Text>
+          <Ionicons name="flag" size={24} color="#1976D2" />
         </View>
       </Marker>
 

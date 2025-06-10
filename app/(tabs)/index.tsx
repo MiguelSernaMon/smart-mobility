@@ -7,7 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import ParallaxScrollView from '@/components/ParallaxScrollView';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
-import { getPopularDestinations, getRecentDestinations, Destination } from '@/utils/destinationStorage';
+import { getPopularDestinations, getRecentDestinations, useDestination, Destination } from '@/utils/destinationStorage';
 import { createEventListener } from '@/utils/eventBus';
 
 export default function HomeScreen() {
@@ -75,16 +75,40 @@ export default function HomeScreen() {
     }
   };
 
-  const handleDestinationPress = (destination: Destination) => {
-    // Navegar directamente a la pantalla de confirmación con las coordenadas
-    router.push({
-      pathname: '/(tabs)/confirm-route-screen',
-      params: { 
-        destinationName: destination.name,
-        destinationLat: destination.coordinates.latitude.toString(),
-        destinationLng: destination.coordinates.longitude.toString()
+  // Modificar la función handleDestinationPress
+  const handleDestinationPress = async (destination: Destination) => {
+    try {
+      // Incrementar el contador de uso del destino
+      if (destination.id) {
+        await useDestination(destination.id);
       }
-    });
+      
+      // Añadir un mensaje de log para depuración
+      console.log('Navegando a destino:', destination.name, 'Coord:', destination.coordinates);
+      
+      // Navegar directamente a la pantalla de confirmación con las coordenadas
+      router.push({
+        pathname: '/(tabs)/confirm-route-screen',
+        params: { 
+          destinationName: destination.name,
+          destinationLat: destination.coordinates.latitude.toString(),
+          destinationLng: destination.coordinates.longitude.toString(),
+          destinationAddress: destination.address || '',
+          destinationId: destination.id || ''
+        }
+      });
+    } catch (error) {
+      console.error('Error al seleccionar destino:', error);
+      // Navegar incluso si hay un error incrementando el contador
+      router.push({
+        pathname: '/(tabs)/confirm-route-screen',
+        params: { 
+          destinationName: destination.name,
+          destinationLat: destination.coordinates.latitude.toString(),
+          destinationLng: destination.coordinates.longitude.toString()
+        }
+      });
+    }
   };
 
   return (
