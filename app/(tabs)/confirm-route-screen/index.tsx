@@ -28,9 +28,10 @@ export default function ConfirmRouteScreen() {
       : -75.57194844226433
   });
   
-  // Inicializar searchQuery con el parámetro destinationName si está disponible
+  // Modificar la forma en que inicializamos searchQuery para asegurarnos de que se muestre
   const [searchQuery, setSearchQuery] = useState(
-    params.destinationName 
+    // Usar el nombre del destino si está disponible y setSearchText es true
+    params.setSearchText === 'true' && params.destinationName 
       ? params.destinationName as string 
       : params.searchQuery as string || ''
   );
@@ -771,6 +772,24 @@ const determineIconFromAddress = (address) => {
       console.error('Error al obtener detalles del POI:', error);
     }
   };
+
+  // Al inicio del componente, después de obtener los parámetros
+useEffect(() => {
+  // Si hay un nombre de destino, establecerlo en el campo de búsqueda
+  if (params.destinationName) {
+    setSearchQuery(params.destinationName as string);
+    
+    // Si además tenemos coordenadas y son válidas, establecer el destino
+    if (hasDestinyParams) {
+      // Ya establecimos el destino con useState al inicio
+      
+      // Si tenemos un ID de destino, podríamos guardar este uso en el historial
+      if (params.destinationId) {
+        // Esto lo estamos manejando con useDestination en HomeScreen
+      }
+    }
+  }
+}, [params.destinationName]);
 
   return (
     <>

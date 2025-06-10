@@ -94,7 +94,8 @@ export default function HomeScreen() {
           destinationLat: destination.coordinates.latitude.toString(),
           destinationLng: destination.coordinates.longitude.toString(),
           destinationAddress: destination.address || '',
-          destinationId: destination.id || ''
+          destinationId: destination.id || '',
+          setSearchText: 'true' // Añadir este parámetro
         }
       });
     } catch (error) {
@@ -105,7 +106,8 @@ export default function HomeScreen() {
         params: { 
           destinationName: destination.name,
           destinationLat: destination.coordinates.latitude.toString(),
-          destinationLng: destination.coordinates.longitude.toString()
+          destinationLng: destination.coordinates.longitude.toString(),
+          setSearchText: 'true' // Añadir este parámetro
         }
       });
     }
