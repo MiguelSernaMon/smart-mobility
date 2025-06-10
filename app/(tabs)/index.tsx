@@ -1,18 +1,54 @@
-import { Image, StyleSheet, Platform, SafeAreaView, View, TextInput, TouchableOpacity, StatusBar } from 'react-native';
+import { Image, StyleSheet, Platform, SafeAreaView, View, TextInput, TouchableOpacity, StatusBar, ActivityIndicator } from 'react-native';
 import { useEffect, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useNavigation, usePathname } from 'expo-router'; // Importar usePathname
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import ParallaxScrollView from '@/components/ParallaxScrollView';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
+import { getPopularDestinations, getRecentDestinations, Destination } from '@/utils/destinationStorage';
 
 export default function HomeScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusBarHeight, setStatusBarHeight] = useState(0);
+  const [popularPlaces, setPopularPlaces] = useState<Destination[]>([]);
+  const [recentTrips, setRecentTrips] = useState<Destination[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const pathname = usePathname(); // Obtener pathname actual
+
+  // Efecto para cargar cuando el componente monta
   useEffect(() => {
     setStatusBarHeight(StatusBar.currentHeight || 0);
+    refreshDestinations();
   }, []);
+
+  // Reemplazar el listener de focus con un efecto que observe cambios en pathname
+  // Este efecto se ejecutará cada vez que el usuario regrese a la pantalla de inicio
+  useEffect(() => {
+    if (pathname === '/(tabs)' || pathname === '/(tabs)/index') {
+      console.log('Home screen focused, refreshing destinations...');
+      refreshDestinations();
+    }
+  }, [pathname]);
+
+  // Función para actualizar los destinos
+  const refreshDestinations = async () => {
+    setIsLoading(true);
+    try {
+      const popular = await getPopularDestinations(4);
+      const recent = await getRecentDestinations(3);
+      
+      console.log(`Cargados ${popular.length} destinos populares y ${recent.length} recientes`);
+      
+      setPopularPlaces(popular);
+      setRecentTrips(recent);
+    } catch (error) {
+      console.error('Error al cargar destinos:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleSearch = () => {
     if (searchQuery.trim()) {
@@ -22,6 +58,18 @@ export default function HomeScreen() {
         params: { searchQuery }
       });
     }
+  };
+
+  const handleDestinationPress = (destination: Destination) => {
+    // Navegar directamente a la pantalla de confirmación con las coordenadas
+    router.push({
+      pathname: '/(tabs)/confirm-route-screen',
+      params: { 
+        destinationName: destination.name,
+        destinationLat: destination.coordinates.latitude.toString(),
+        destinationLng: destination.coordinates.longitude.toString()
+      }
+    });
   };
 
   return (
@@ -68,13 +116,29 @@ export default function HomeScreen() {
         <ThemedView style={styles.titleContainer}>
           <ThemedText type="title">Smart Mobility</ThemedText>
         </ThemedView>
+        
         <ThemedView style={styles.stepContainer}>
           <ThemedText type="subtitle">Tus lugares preferidos</ThemedText>
-          <PopularDestinations />
+          {isLoading ? (
+            <ActivityIndicator size="small" color="#1976D2" />
+          ) : (
+            <PopularDestinations 
+              destinations={popularPlaces} 
+              onDestinationPress={handleDestinationPress} 
+            />
+          )}
         </ThemedView>
+        
         <ThemedView style={styles.stepContainer}>
           <ThemedText type="subtitle">Últimos viajes</ThemedText>
-          <RecentTrips />
+          {isLoading ? (
+            <ActivityIndicator size="small" color="#1976D2" />
+          ) : (
+            <RecentTrips 
+              trips={recentTrips}
+              onTripPress={handleDestinationPress}
+            />
+          )}
         </ThemedView>
       </ParallaxScrollView>
     </SafeAreaView>
@@ -83,22 +147,36 @@ export default function HomeScreen() {
 }
 
 // Componente para mostrar destinos populares
-const PopularDestinations = () => {
-  const destinations = [
-    { name: "Universidad de Antioquia", icon: "school" },
-    { name: "Centro Comercial El Tesoro", icon: "cart" },
-    { name: "Parque Arví", icon: "leaf" },
-    { name: "Aeropuerto José María Córdova", icon: "airplane" }
-  ];
+const PopularDestinations = ({ destinations, onDestinationPress }) => {
+  // Verificar si hay destinos
+  if (!destinations || destinations.length === 0) {
+    return (
+      <View style={styles.emptyDestinationsContainer}>
+        <Ionicons name="star-outline" size={40} color="#ccc" />
+        <ThemedText style={styles.emptyDestinationsText}>
+          Los lugares que más visites aparecerán aquí
+        </ThemedText>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.popularDestinations}>
       {destinations.map((destination, index) => (
-        <TouchableOpacity key={index} style={styles.destinationItem}>
+        <TouchableOpacity 
+          key={destination.id || index} 
+          style={styles.destinationItem}
+          onPress={() => onDestinationPress(destination)}
+        >
           <Ionicons name={destination.icon} size={24} color="#1976D2" />
           <ThemedText numberOfLines={1} style={styles.destinationText}>
             {destination.name}
           </ThemedText>
+          {destination.count > 0 && (
+            <ThemedText style={styles.countBadge}>
+              {destination.count}x
+            </ThemedText>
+          )}
         </TouchableOpacity>
       ))}
     </View>
@@ -106,25 +184,50 @@ const PopularDestinations = () => {
 };
 
 // Componente para mostrar viajes recientes
-const RecentTrips = () => {
-  const trips = [
-    { origin: "Casa", destination: "Trabajo", date: "Hoy" },
-    { origin: "Trabajo", destination: "Gimnasio", date: "Ayer" },
-    { origin: "Casa", destination: "Centro Comercial", date: "15 Abril" }
-  ];
+const RecentTrips = ({ trips, onTripPress }) => {
+  if (!trips || trips.length === 0) {
+    // Mostrar mensaje cuando no hay viajes recientes
+    return (
+      <View style={styles.emptyTripsContainer}>
+        <Ionicons name="time-outline" size={40} color="#ccc" />
+        <ThemedText style={styles.emptyTripsText}>
+          Aquí aparecerá tu historial de viajes
+        </ThemedText>
+      </View>
+    );
+  }
+
+  // Formatear fecha
+  const formatDate = (timestamp) => {
+    if (!timestamp) return 'N/A';
+    
+    const date = new Date(timestamp);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    
+    if (date.toDateString() === today.toDateString()) return 'Hoy';
+    if (date.toDateString() === yesterday.toDateString()) return 'Ayer';
+    
+    return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+  };
 
   return (
     <View style={styles.recentTrips}>
       {trips.map((trip, index) => (
-        <TouchableOpacity key={index} style={styles.tripItem}>
+        <TouchableOpacity 
+          key={trip.id || index} 
+          style={styles.tripItem}
+          onPress={() => onTripPress(trip)}
+        >
           <View style={styles.tripIconContainer}>
-            <Ionicons name="time" size={20} color="#666" />
+            <Ionicons name={trip.icon || "time"} size={20} color="#666" />
           </View>
           <View style={styles.tripDetails}>
-            <ThemedText style={styles.tripText}>
-              {trip.origin} → {trip.destination}
+            <ThemedText style={styles.tripText}>{trip.name}</ThemedText>
+            <ThemedText style={styles.tripDate}>
+              {trip.address} • {formatDate(trip.lastUsed)}
             </ThemedText>
-            <ThemedText style={styles.tripDate}>{trip.date}</ThemedText>
           </View>
           <Ionicons name="chevron-forward" size={20} color="#999" />
         </TouchableOpacity>
@@ -142,7 +245,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'ios' ? 4 : 12, // SafeAreaView ya proporciona margen en iOS
+    paddingTop: Platform.OS === 'ios' ? 4 : 12,
     paddingBottom: 12,
     backgroundColor: '#f1f1f1',
     zIndex: 1,
@@ -200,7 +303,6 @@ const styles = StyleSheet.create({
   reactLogo: {
     width: '100%',
     height: '100%',
-
   },
   popularDestinations: {
     marginTop: 8,
@@ -217,6 +319,14 @@ const styles = StyleSheet.create({
     marginLeft: 10,
     fontSize: 15,
     flex: 1,
+  },
+  countBadge: {
+    backgroundColor: '#1976D2',
+    color: 'white',
+    fontSize: 12,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
   },
   recentTrips: {
     marginTop: 8,
@@ -247,5 +357,34 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#666',
     marginTop: 2,
+  },
+  // Estilos para estados vacíos
+  emptyTripsContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+    backgroundColor: '#f8f8f8',
+    borderRadius: 8,
+    marginTop: 8,
+  },
+  emptyTripsText: {
+    fontSize: 14,
+    color: '#888',
+    textAlign: 'center',
+    marginTop: 10,
+  },
+  emptyDestinationsContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+    backgroundColor: '#f8f8f8',
+    borderRadius: 8,
+    marginTop: 8,
+  },
+  emptyDestinationsText: {
+    fontSize: 14,
+    color: '#888',
+    textAlign: 'center',
+    marginTop: 10,
   },
 });

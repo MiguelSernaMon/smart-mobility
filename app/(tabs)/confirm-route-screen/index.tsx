@@ -9,6 +9,7 @@ import NoRoutesMessage from "@/components/NoRoutesMessage";
 import RouteActiveInfo from "@/components/RouteActiveInfo";
 import WeatherAlert from "@/components/WeatherAlert";
 import { Ionicons } from "@expo/vector-icons";
+import { saveDestination } from '@/utils/destinationStorage';
 
 export default function ConfirmRouteScreen() {
   const params = useLocalSearchParams();
@@ -276,6 +277,26 @@ export default function ConfirmRouteScreen() {
         setSearchQuery(prediction.description);
         setShowPredictions(false);
         
+        // Guardar este destino en el almacenamiento local
+        const destinationData = {
+          id: prediction.place_id,
+          name: prediction.structured_formatting?.main_text || prediction.description.split(',')[0],
+          address: data.result.formatted_address || prediction.description,
+          icon: determineIconFromAddress(prediction.description),
+          coordinates: {
+            latitude: location.lat,
+            longitude: location.lng
+          }
+        };
+        
+        // Guardar en almacenamiento con try-catch para manejar errores
+        try {
+          await saveDestination(destinationData);
+          console.log("Destino guardado exitosamente:", destinationData.name);
+        } catch (error) {
+          console.error("Error guardando destino:", error);
+        }
+        
         if (mapRef.current) {
           mapRef.current.fitToCoordinates(
             [origin, newDestiny],
@@ -297,6 +318,31 @@ export default function ConfirmRouteScreen() {
       Alert.alert("Error", "No se pudieron obtener los detalles del lugar seleccionado");
     }
   };
+  // Agregar esta función auxiliar para determinar el icono basado en la dirección
+const determineIconFromAddress = (address) => {
+  address = address.toLowerCase();
+  
+  if (address.includes('universidad') || address.includes('colegio') || address.includes('escuela')) {
+    return 'school';
+  } else if (address.includes('hospital') || address.includes('clínica')) {
+    return 'medkit';
+  } else if (address.includes('centro comercial') || address.includes('mall')) {
+    return 'cart';
+  } else if (address.includes('parque')) {
+    return 'leaf';
+  } else if (address.includes('aeropuerto')) {
+    return 'airplane';
+  } else if (address.includes('restaurante') || address.includes('café')) {
+    return 'restaurant';
+  } else if (address.includes('hotel')) {
+    return 'bed';
+  } else if (address.includes('estación')) {
+    return 'train';
+  } else {
+    return 'location';
+  }
+};
+
   const searchDestination = async () => {
     if (!searchQuery.trim()) {
       Alert.alert("Error", "Por favor ingresa una dirección de destino");
@@ -323,6 +369,27 @@ export default function ConfirmRouteScreen() {
         };
         
         setDestiny(newDestiny);
+        
+        // Guardar este destino en el almacenamiento local
+        const destinationData = {
+          id: data.results[0].place_id || Date.now().toString(),
+          name: searchQuery.split(',')[0],
+          address: data.results[0].formatted_address,
+          icon: determineIconFromAddress(data.results[0].formatted_address),
+          coordinates: {
+            latitude: location.lat,
+            longitude: location.lng
+          }
+        };
+        
+        // Guardar en almacenamiento con try-catch para manejar errores
+        try {
+          await saveDestination(destinationData);
+          console.log("Destino guardado exitosamente:", destinationData.name);
+        } catch (error) {
+          console.error("Error guardando destino:", error);
+        }
+        
         setSearchQuery("");
         
         if (mapRef.current) {
