@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { emitEvent } from './eventBus';
 
 export interface Destination {
   id: string;
@@ -44,46 +45,38 @@ export const saveDestination = async (destination: Omit<Destination, 'count' | '
     // Obtenemos los destinos existentes
     const destinations = await getDestinations();
     
-    // Verificamos si el destino ya existe (por nombre o por coordenadas)
+    // Verificamos si el destino ya existe
     const existingIndex = destinations.findIndex(dest => {
-      // Comparar por ID si está disponible
-      if (destination.id && dest.id === destination.id) {
-        return true;
-      }
+      // Comparaciones como antes...
+      if (destination.id && dest.id === destination.id) return true;
+      if (dest.name === destination.name) return true;
       
-      // Comparar por nombre
-      if (dest.name === destination.name) {
-        return true;
-      }
-      
-      // Comparar por coordenadas cercanas (Si están muy próximas, consideramos que es el mismo lugar)
       if (destination.coordinates && dest.coordinates) {
         const latDiff = Math.abs(dest.coordinates.latitude - destination.coordinates.latitude);
         const lngDiff = Math.abs(dest.coordinates.longitude - destination.coordinates.longitude);
-        return (latDiff < 0.001 && lngDiff < 0.001); // Aproximadamente 100 metros
+        return (latDiff < 0.001 && lngDiff < 0.001);
       }
       
       return false;
     });
     
     const now = Date.now();
+    let updatedDestinations = [...destinations];
     
     if (existingIndex !== -1) {
       // Actualizar destino existente
-      destinations[existingIndex] = {
-        ...destinations[existingIndex],
-        count: (destinations[existingIndex].count || 0) + 1,
+      updatedDestinations[existingIndex] = {
+        ...updatedDestinations[existingIndex],
+        count: (updatedDestinations[existingIndex].count || 0) + 1,
         lastUsed: now,
-        // Actualizar la dirección en caso de que sea más precisa
-        address: destination.address || destinations[existingIndex].address,
-        // Mantener el icono original si no hay uno nuevo
-        icon: destination.icon || destinations[existingIndex].icon
+        address: destination.address || updatedDestinations[existingIndex].address,
+        icon: destination.icon || updatedDestinations[existingIndex].icon
       };
       
-      console.log("Destino actualizado:", destinations[existingIndex].name, "Contador:", destinations[existingIndex].count);
+      console.log("Destino actualizado:", updatedDestinations[existingIndex].name, "Contador:", updatedDestinations[existingIndex].count);
     } else {
       // Agregar nuevo destino
-      destinations.push({
+      updatedDestinations.push({
         ...destination,
         count: 1,
         lastUsed: now
@@ -93,10 +86,13 @@ export const saveDestination = async (destination: Omit<Destination, 'count' | '
     }
     
     // Guardar la lista actualizada
-    await AsyncStorage.setItem(DESTINATIONS_STORAGE_KEY, JSON.stringify(destinations));
+    await AsyncStorage.setItem(DESTINATIONS_STORAGE_KEY, JSON.stringify(updatedDestinations));
+    
+    // Emitir evento de actualización
+    emitEvent('destinationUpdate');
   } catch (error) {
     console.error('Error al guardar destino:', error);
-    throw error; // Re-lanzar error para que pueda ser capturado por el llamante
+    throw error;
   }
 };
 

@@ -293,6 +293,11 @@ export default function ConfirmRouteScreen() {
         try {
           await saveDestination(destinationData);
           console.log("Destino guardado exitosamente:", destinationData.name);
+          
+          // Notificar que los destinos han sido actualizados
+          if (global.destinationUpdateListeners) {
+            global.destinationUpdateListeners.forEach(callback => callback());
+          }
         } catch (error) {
           console.error("Error guardando destino:", error);
         }
@@ -386,6 +391,11 @@ const determineIconFromAddress = (address) => {
         try {
           await saveDestination(destinationData);
           console.log("Destino guardado exitosamente:", destinationData.name);
+          
+          // Notificar que los destinos han sido actualizados
+          if (global.destinationUpdateListeners) {
+            global.destinationUpdateListeners.forEach(callback => callback());
+          }
         } catch (error) {
           console.error("Error guardando destino:", error);
         }

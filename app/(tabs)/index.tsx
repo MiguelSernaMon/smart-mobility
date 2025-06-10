@@ -1,13 +1,14 @@
 import { Image, StyleSheet, Platform, SafeAreaView, View, TextInput, TouchableOpacity, StatusBar, ActivityIndicator } from 'react-native';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';  // Añadir useCallback
 import { Ionicons } from '@expo/vector-icons';
-import { router, useNavigation, usePathname } from 'expo-router'; // Importar usePathname
+import { router, useFocusEffect } from 'expo-router';  // Cambiar usePathname por useFocusEffect
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import ParallaxScrollView from '@/components/ParallaxScrollView';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { getPopularDestinations, getRecentDestinations, Destination } from '@/utils/destinationStorage';
+import { createEventListener } from '@/utils/eventBus';
 
 export default function HomeScreen() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -15,7 +16,6 @@ export default function HomeScreen() {
   const [popularPlaces, setPopularPlaces] = useState<Destination[]>([]);
   const [recentTrips, setRecentTrips] = useState<Destination[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const pathname = usePathname(); // Obtener pathname actual
 
   // Efecto para cargar cuando el componente monta
   useEffect(() => {
@@ -23,14 +23,29 @@ export default function HomeScreen() {
     refreshDestinations();
   }, []);
 
-  // Reemplazar el listener de focus con un efecto que observe cambios en pathname
-  // Este efecto se ejecutará cada vez que el usuario regrese a la pantalla de inicio
-  useEffect(() => {
-    if (pathname === '/(tabs)' || pathname === '/(tabs)/index') {
+  // Usar useFocusEffect para refrescar los datos cada vez que la pantalla recibe foco
+  useFocusEffect(
+    useCallback(() => {
       console.log('Home screen focused, refreshing destinations...');
       refreshDestinations();
-    }
-  }, [pathname]);
+      return () => {
+        // Limpiar cualquier suscripción si es necesario
+        console.log('Home screen blurred');
+      };
+    }, [])
+  );
+
+  // Escuchar cambios en destinos
+  useEffect(() => {
+    // Crear un listener para actualizaciones de destinos
+    const unsubscribe = createEventListener('destinationUpdate', () => {
+      console.log('Evento de actualización de destinos recibido');
+      refreshDestinations();
+    });
+    
+    // Limpiar al desmontar
+    return () => unsubscribe();
+  }, []);
 
   // Función para actualizar los destinos
   const refreshDestinations = async () => {
