@@ -3,6 +3,7 @@ import { useLocalSearchParams } from 'expo-router';
 import * as Location from "expo-location";
 import { StyleSheet, View, Alert, StatusBar, Platform, SafeAreaView, FlatList, TouchableOpacity, Text } from "react-native";
 import { router } from 'expo-router';
+import * as Speech from 'expo-speech';
 
 import Header from "@/components/Header";
 import RouteMap from "@/components/RouteMap";
@@ -12,6 +13,23 @@ import WeatherAlert from "@/components/WeatherAlert";
 import { Ionicons } from "@expo/vector-icons";
 import { saveDestination } from '@/utils/destinationStorage';
 
+// Interfaces para TypeScript
+interface AudioPoint {
+  id: string;
+  latitude: number;
+  longitude: number;
+  title: string;
+  description: string;
+  radius: number;
+  audioText: string;
+  triggered: boolean;
+}
+
+interface Coordinates {
+  latitude: number;
+  longitude: number;
+}
+
 export default function ConfirmRouteScreen() {
   const params = useLocalSearchParams();
   
@@ -19,7 +37,7 @@ export default function ConfirmRouteScreen() {
   const hasDestinyParams = !!(params.destinationLat && params.destinationLng);
   
   // Inicializar destino con parámetros o valores predeterminados
-  const [destiny, setDestiny] = useState({
+  const [destiny, setDestiny] = useState<Coordinates>({
     latitude: hasDestinyParams 
       ? parseFloat(params.destinationLat as string) 
       : 6.296242626909633,
@@ -29,7 +47,7 @@ export default function ConfirmRouteScreen() {
   });
   
   // Modificar la forma en que inicializamos searchQuery para asegurarnos de que se muestre
-  const [searchQuery, setSearchQuery] = useState(
+  const [searchQuery, setSearchQuery] = useState<string>(
     // Usar el nombre del destino si está disponible y setSearchText es true
     params.setSearchText === 'true' && params.destinationName 
       ? params.destinationName as string 
@@ -57,17 +75,11 @@ export default function ConfirmRouteScreen() {
       // Corto retraso para asegurar que el mapa esté listo
       const timer = setTimeout(() => {
         try {
-          if (mapRef.current) {
-            mapRef.current.fitToCoordinates(
+          if (mapRef.current && (mapRef.current as any).fitToCoordinates) {
+            (mapRef.current as any).fitToCoordinates(
               [origin, destiny],
               { edgePadding: { top: 100, right: 100, bottom: 100, left: 100 }, animated: true }
             );
-          }
-          
-          // Si tenemos un destinationId, mostrar opciones para buscar rutas
-          if (params.destinationId) {
-            setPrepareRequest(true);
-            // Opcional: Mostrar una mini tarjeta o botón flotante para buscar rutas
           }
         } catch (error) {
           console.error("Error ajustando mapa:", error);
@@ -78,32 +90,236 @@ export default function ConfirmRouteScreen() {
     }
   }, [hasDestinyParams]);
   
-  const mapRef = React.useRef(null);
-  const [statusBarHeight, setStatusBarHeight] = useState(0);
+  const mapRef = React.useRef<any>(null);
+  const [statusBarHeight, setStatusBarHeight] = useState<number>(0);
 
-  const [activeRoute, setActiveRoute] = useState(null);
-  const [activeRoutePolyline, setActiveRoutePolyline] = useState('');
+  const [activeRoute, setActiveRoute] = useState<any>(null);
+  const [activeRoutePolyline, setActiveRoutePolyline] = useState<string>('');
 
-  const [origin, setOrigin] = useState({
+  const [origin, setOrigin] = useState<Coordinates>({
     latitude: 6.252565,
     longitude: -75.570568,
   });
 
-  const [loading, setLoading] = useState(false);
-  const [searchLoading, setSearchLoading] = useState(false);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [searchLoading, setSearchLoading] = useState<boolean>(false);
 
   // Nuevos estados para el autocompletado
-  const [predictions, setPredictions] = useState([]);
-  const [showPredictions, setShowPredictions] = useState(false);
-  const [searchTimer, setSearchTimer] = useState(null);
+  const [predictions, setPredictions] = useState<any[]>([]);
+  const [showPredictions, setShowPredictions] = useState<boolean>(false);
+  const [searchTimer, setSearchTimer] = useState<NodeJS.Timeout | null>(null);
   // Agregar este estado para el cache
-  const [predictionsCache, setPredictionsCache] = useState({});
-  const [POIs, setPOIs] = useState([]);
-  const [showPOIs, setShowPOIs] = useState(false);
-  const [selectedPOITypes, setSelectedPOITypes] = useState(['restaurant', 'tourist_attraction']);
+  const [predictionsCache, setPredictionsCache] = useState<{[key: string]: any}>({});
+  const [POIs, setPOIs] = useState<any[]>([]);
+  const [showPOIs, setShowPOIs] = useState<boolean>(false);
+  const [selectedPOITypes, setSelectedPOITypes] = useState<string[]>(['restaurant', 'tourist_attraction']);
+  
+  // Estados para audio de accesibilidad
+  const [audioPoints, setAudioPoints] = useState<AudioPoint[]>([]);
+  const [currentAudio, setCurrentAudio] = useState<any>(null);
+  const [isPlayingAudio, setIsPlayingAudio] = useState<boolean>(false);
+  const [userLocation, setUserLocation] = useState<Coordinates | null>(null);
+
   useEffect(() => {
     setStatusBarHeight(StatusBar.currentHeight || 0);
+    
+    // Inicializar puntos de audio para accesibilidad
+    initializeAudioPoints();
+    
+    // Configurar audio para reproducir en silencio si es necesario
+    configureAudio();
   }, []);
+
+  // Nuevo efecto para monitorear cambios en ubicación y puntos de audio
+  useEffect(() => {
+    console.log('🔄 Cambio detectado en ubicación o puntos de audio');
+    console.log('📍 UserLocation:', userLocation);
+    console.log('📍 AudioPoints:', audioPoints.length);
+    
+    if (userLocation && audioPoints.length > 0) {
+      console.log('✅ Ambos datos disponibles, verificando proximidad...');
+      checkAudioPointProximity();
+    }
+  }, [userLocation, audioPoints]);
+
+  // Configurar audio
+  const configureAudio = async () => {
+    try {
+      // Verificar si el speech está disponible
+      const isAvailable = await Speech.isSpeakingAsync();
+      console.log('Speech está disponible:', !isAvailable);
+    } catch (error) {
+      console.error('Error verificando disponibilidad de speech:', error);
+    }
+  };
+
+  // Inicializar puntos de audio (datos quemados por ahora)
+  const initializeAudioPoints = () => {
+    const points = [
+      {
+        id: "metro_universidad_antioquia",
+        latitude: 6.269373,
+        longitude: -75.566537,
+        title: "Estación Metro Universidad de Antioquia",
+        description: "Entrada accesible al Metro",
+        radius: 50, // metros
+        audioText: `Punto de partida: Portería del Metro dentro del campus de la Universidad de Antioquia
+
+Ubicación inicial:
+Sales por la portería del Metro ubicada dentro del campus (zona norte, cerca de la Facultad de Medicina y el Edificio de Extensión). Aquí hay una pequeña rampa con barandas metálicas y una superficie rugosa que ayuda a identificar el cambio de zona.
+
+Giro hacia la izquierda:
+Al salir de la portería, gira hacia la izquierda. A unos pocos pasos, sentirás una baranda metálica que guía hacia las escaleras de ingreso a la estación. La pared del lado izquierdo puede servir como guía táctil.
+
+Escaleras de subida:
+Las escaleras hacia el Metro están rectas frente a ti. Son aproximadamente 15 escalones divididos en dos tramos con un descanso intermedio. Ambos tramos cuentan con pasamanos metálicos en ambos lados, ideales para apoyo. El piso tiene texturas diferentes en los bordes de los escalones, lo que puede servir como señal táctil para anticipar cada peldaño.
+
+Ingreso a la estación:
+Al subir las escaleras, sentirás un cambio en la acústica (ambiente cerrado y techado). Estás en la zona de ingreso de la estación Universidad. A tu derecha están los torniquetes y el punto de control.
+
+Apoyo del personal:
+Puedes solicitar apoyo al personal del Metro, quienes están disponibles en la entrada para guiarte hasta el andén o brindarte indicaciones. También puedes acercarte al módulo de atención al usuario.`,
+        triggered: false,
+      },
+    ];
+    setAudioPoints(points);
+  };
+
+  // Función para calcular distancia entre dos coordenadas
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+    const R = 6371e3; // Radio de la Tierra en metros
+    const φ1 = lat1 * Math.PI / 180;
+    const φ2 = lat2 * Math.PI / 180;
+    const Δφ = (lat2 - lat1) * Math.PI / 180;
+    const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+    const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+              Math.cos(φ1) * Math.cos(φ2) *
+              Math.sin(Δλ/2) * Math.sin(Δλ/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+    return R * c; // Distancia en metros
+  };
+
+  // Reproducir audio usando text-to-speech nativo
+  const playAudioDescription = async (audioText: string) => {
+    try {
+      console.log('🔊 Intentando reproducir audio...');
+      console.log('📝 Texto del audio:', audioText.substring(0, 100) + '...');
+      console.log('🎵 Estado actual del audio:', { isPlayingAudio });
+      
+      if (isPlayingAudio) {
+        console.log('⚠️ Ya hay un audio reproduciéndose, saltando...');
+        return; // Ya hay un audio reproduciéndose
+      }
+
+      console.log('✅ Iniciando reproducción de audio...');
+      setIsPlayingAudio(true);
+
+      // Detener cualquier speech que esté en progreso
+      await Speech.stop();
+      console.log('🛑 Speech anterior detenido');
+
+      // Configurar opciones de speech
+      const speechOptions = {
+        language: 'es-ES', // Español de España
+        pitch: 1.0,
+        rate: 0.7, // Velocidad más lenta para mejor comprensión
+        voice: undefined, // Usar voz por defecto
+        onStart: () => {
+          console.log('✅ Audio iniciado exitosamente');
+        },
+        onDone: () => {
+          console.log('✅ Audio terminado');
+          setIsPlayingAudio(false);
+        },
+        onStopped: () => {
+          console.log('🛑 Audio detenido');
+          setIsPlayingAudio(false);
+        },
+        onError: (error: any) => {
+          console.error('❌ Error en speech:', error);
+          setIsPlayingAudio(false);
+          // Mostrar alerta con el texto como fallback
+          Alert.alert(
+            "Información de Accesibilidad",
+            audioText,
+            [{ text: "Entendido" }]
+          );
+        }
+      };
+
+      // Reproducir el audio
+      console.log('🎤 Llamando a Speech.speak...');
+      Speech.speak(audioText, speechOptions);
+      
+      console.log('✅ Speech.speak llamado exitosamente');
+      
+    } catch (error) {
+      console.error('❌ Error reproduciendo audio:', error);
+      setIsPlayingAudio(false);
+      
+      // Fallback: mostrar el texto en una alerta
+      Alert.alert(
+        "Información de Accesibilidad",
+        audioText,
+        [{ text: "Entendido" }]
+      );
+    }
+  };
+
+  // Monitorear proximidad a puntos de audio
+  const checkAudioPointProximity = async () => {
+    console.log('🔍 Verificando proximidad a puntos de audio...');
+    console.log('📍 Ubicación del usuario:', userLocation);
+    console.log('📍 Puntos de audio disponibles:', audioPoints.length);
+    
+    if (!userLocation || audioPoints.length === 0) {
+      console.log('⚠️ No hay ubicación de usuario o puntos de audio');
+      return;
+    }
+
+    for (const point of audioPoints) {
+      const distance = calculateDistance(
+        userLocation.latitude,
+        userLocation.longitude,
+        point.latitude,
+        point.longitude
+      );
+
+      console.log(`📏 Distancia al punto ${point.title}: ${distance.toFixed(2)} metros (radio: ${point.radius}m, triggered: ${point.triggered})`);
+
+      // Si está dentro del radio y no se ha reproducido aún
+      if (distance <= point.radius && !point.triggered) {
+        console.log(`🔊 ¡USUARIO CERCA! Reproduciendo audio para ${point.title}...`);
+        
+        // Marcar como activado inmediatamente
+        setAudioPoints(prevPoints => 
+          prevPoints.map(p => 
+            p.id === point.id ? { ...p, triggered: true } : p
+          )
+        );
+
+        // Reproducir audio inmediatamente
+        try {
+          await playAudioDescription(point.audioText);
+          console.log('✅ Audio reproducido exitosamente');
+        } catch (error) {
+          console.error('❌ Error reproduciendo audio:', error);
+        }
+
+        // Reset del trigger después de 2 minutos para permitir activación futura
+        setTimeout(() => {
+          console.log(`🔄 Reseteando trigger para ${point.title}`);
+          setAudioPoints(prevPoints => 
+            prevPoints.map(p => 
+              p.id === point.id ? { ...p, triggered: false } : p
+            )
+          );
+        }, 120000); // 2 minutos
+      }
+    }
+  };
 
   useEffect(() => {
     if (params.selectedRouteId && params.polyline) {
@@ -504,11 +720,64 @@ const determineIconFromAddress = (address) => {
     }
 
     let location = await Location.getCurrentPositionAsync({});
-    setOrigin({
+    const newOrigin = {
       latitude: location.coords.latitude,
       longitude: location.coords.longitude,
-    });
+    };
+    
+    setOrigin(newOrigin);
+    setUserLocation(newOrigin);
+    
+    // Iniciar monitoreo de ubicación para puntos de audio
+    startLocationMonitoring();
   }
+
+  // Iniciar monitoreo continuo de ubicación para puntos de audio
+  const startLocationMonitoring = async () => {
+    try {
+      console.log('🚀 Iniciando monitoreo de ubicación para puntos de audio...');
+      
+      // Solicitar permisos de ubicación en primer plano
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        console.log('⚠️ Permisos de ubicación denegados');
+        return;
+      }
+
+      console.log('✅ Permisos de ubicación concedidos, configurando seguimiento...');
+
+      // Configurar el seguimiento de ubicación
+      const subscription = await Location.watchPositionAsync(
+        {
+          accuracy: Location.Accuracy.BestForNavigation,
+          timeInterval: 5000, // Actualizar cada 5 segundos
+          distanceInterval: 10, // O cuando se mueva al menos 10 metros
+        },
+        (location) => {
+          const newLocation = {
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+          };
+          
+          console.log('📍 Nueva ubicación recibida:', newLocation);
+          setUserLocation(newLocation);
+          
+          // Verificar proximidad a puntos de audio
+          checkAudioPointProximity();
+        }
+      );
+
+      console.log('✅ Monitoreo de ubicación configurado exitosamente');
+
+      // Guardar la suscripción para poder cancelarla después
+      return () => {
+        console.log('🛑 Deteniendo monitoreo de ubicación');
+        subscription.remove();
+      };
+    } catch (error) {
+      console.error('❌ Error configurando monitoreo de ubicación:', error);
+    }
+  };
 
   const fetchBusRoutes = async (destinationCoords = null) => {
     setLoading(true);
@@ -853,8 +1122,92 @@ useEffect(() => {
         destiny={destiny}
         activeRoutePolyline={activeRoutePolyline}
         POIs={showPOIs ? POIs : []}
-        onPOIPress={(poi) => handlePOIPress(poi)}
+        onPOIPress={(poi: any) => handlePOIPress(poi)}
+        audioPoints={audioPoints}
+        onAudioPointPress={(point: AudioPoint) => {
+          Alert.alert(
+            point.title,
+            point.description,
+            [
+              {
+                text: "Reproducir audio",
+                onPress: () => playAudioDescription(point.audioText)
+              },
+              {
+                text: "Cerrar",
+                style: "cancel"
+              }
+            ]
+          );
+        }}
       />
+      
+      {/* Botón flotante para probar audio de accesibilidad */}
+      <TouchableOpacity
+        style={[styles.accessibilityButton, { backgroundColor: isPlayingAudio ? '#FF8A65' : '#FF6B35' }]}
+        onPress={() => {
+          if (isPlayingAudio) {
+            // Detener audio si está reproduciéndose
+            Speech.stop();
+            setIsPlayingAudio(false);
+            console.log('Audio detenido manualmente');
+          } else if (audioPoints.length > 0) {
+            console.log('Probando audio manualmente...');
+            playAudioDescription(audioPoints[0].audioText);
+          } else {
+            console.log('No hay puntos de audio configurados');
+            Alert.alert('Prueba de Audio', 'No hay puntos de audio configurados');
+          }
+        }}
+      >
+        <Ionicons 
+          name={isPlayingAudio ? "stop" : "volume-high"} 
+          size={24} 
+          color="white" 
+        />
+      </TouchableOpacity>
+
+      {/* Botón adicional para probar audio simple */}
+      <TouchableOpacity
+        style={styles.testAudioButton}
+        onPress={() => {
+          console.log('🔊 Probando audio simple...');
+          playAudioDescription("Hola, esto es una prueba de audio para accesibilidad. Si puedes escuchar esto, el sistema de audio está funcionando correctamente.");
+        }}
+      >
+        <Text style={styles.testAudioText}>🔊 Probar Audio</Text>
+      </TouchableOpacity>
+
+      {/* Botón para simular proximidad al punto de audio */}
+      <TouchableOpacity
+        style={styles.simulateProximityButton}
+        onPress={() => {
+          console.log('🎯 Simulando proximidad al punto de audio...');
+          if (audioPoints.length > 0) {
+            console.log('📍 Configurando ubicación simulada cerca del punto de audio...');
+            const point = audioPoints[0];
+            
+            // Simular que estamos muy cerca del punto (5 metros)
+            const simulatedLocation = {
+              latitude: point.latitude + 0.00004, // Aproximadamente 5 metros
+              longitude: point.longitude + 0.00004
+            };
+            
+            console.log('📍 Ubicación simulada:', simulatedLocation);
+            setUserLocation(simulatedLocation);
+            
+            // Forzar verificación inmediata
+            setTimeout(() => {
+              console.log('🔍 Forzando verificación de proximidad...');
+              checkAudioPointProximity();
+            }, 1000);
+          } else {
+            console.log('⚠️ No hay puntos de audio configurados');
+          }
+        }}
+      >
+        <Text style={styles.testAudioText}>🎯 Simular Cerca</Text>
+      </TouchableOpacity>
       
       {/* Mostrar mensaje solo si no hay ruta activa ni está cargando */}
       {!loading && !activeRoute && !showPredictions && <NoRoutesMessage />}
@@ -867,6 +1220,62 @@ useEffect(() => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  accessibilityButton: {
+    position: 'absolute',
+    bottom: 80,
+    right: 20,
+    backgroundColor: '#FF6B35',
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+    zIndex: 1000,
+  },
+  testAudioButton: {
+    position: 'absolute',
+    bottom: 150,
+    right: 20,
+    backgroundColor: '#4CAF50',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+    zIndex: 1000,
+  },
+  simulateProximityButton: {
+    position: 'absolute',
+    bottom: 220,
+    right: 20,
+    backgroundColor: '#FF9800',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+    zIndex: 1000,
+  },
+  testAudioText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: 'bold',
   },
   predictionsContainer: {
     position: 'absolute',

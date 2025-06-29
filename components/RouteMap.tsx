@@ -1,6 +1,6 @@
 import React, { useEffect } from "react";
 import { StyleSheet, Text, View, Platform } from "react-native";
-import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from "react-native-maps";
+import MapView, { Marker, Polyline, PROVIDER_GOOGLE, Circle } from "react-native-maps";
 import MapViewDirections from "react-native-maps-directions";
 import { decode } from "@mapbox/polyline";
 import Ionicons from 'react-native-vector-icons/Ionicons';
@@ -24,6 +24,17 @@ interface SchoolZone {
   title: string;
 }
 
+interface AudioPoint {
+  id: string;
+  latitude: number;
+  longitude: number;
+  title: string;
+  description: string;
+  radius: number;
+  audioText: string;
+  triggered: boolean;
+}
+
 interface RouteMapProps {
   mapRef: React.RefObject<MapView>;
   origin: { latitude: number; longitude: number };
@@ -35,6 +46,8 @@ interface RouteMapProps {
   activeRoute?: any;
   POIs?: any[];
   onPOIPress?: (poi: any) => void;
+  audioPoints?: AudioPoint[];
+  onAudioPointPress?: (point: AudioPoint) => void;
 }
 
 const RouteMap = ({ 
@@ -47,7 +60,9 @@ const RouteMap = ({
   activeRoutePolyline = '',
   activeRoute = null,
   POIs  = [] , 
-  onPOIPress = () => {} 
+  onPOIPress = () => {},
+  audioPoints = [],
+  onAudioPointPress = () => {}
 }: RouteMapProps) => {
   
   // Verificar si hay una ruta activa o seleccionada
@@ -408,6 +423,39 @@ const RouteMap = ({
           </View>
         </Marker>
       ))}
+
+      {/* Marcadores de puntos de audio para accesibilidad */}
+      {audioPoints && audioPoints.map((point) => (
+        <Marker
+          key={`audio-point-${point.id}`}
+          coordinate={{
+            latitude: point.latitude,
+            longitude: point.longitude
+          }}
+          title={point.title}
+          description={point.description}
+          onPress={() => onAudioPointPress && onAudioPointPress(point)}
+        >
+          <View style={styles.audioPointMarker}>
+            <Ionicons name="volume-high" size={20} color="#FF6B35" />
+          </View>
+        </Marker>
+      ))}
+
+      {/* Círculo de proximidad para puntos de audio */}
+      {audioPoints && audioPoints.map((point) => (
+        <Circle
+          key={`audio-circle-${point.id}`}
+          center={{
+            latitude: point.latitude,
+            longitude: point.longitude
+          }}
+          radius={point.radius}
+          strokeColor="rgba(255, 107, 53, 0.5)"
+          fillColor="rgba(255, 107, 53, 0.1)"
+          strokeWidth={2}
+        />
+      ))}
     </MapView>
   );
 };
@@ -417,18 +465,50 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   originMarker: {
-    backgroundColor: 'white',
+    backgroundColor: '#4CAF50',
+    padding: 6,
     borderRadius: 20,
-    padding: 5,
-    borderWidth: 1,
-    borderColor: '#007bff',
+    borderWidth: 2,
+    borderColor: 'white',
   },
   destinyMarker: {
-    backgroundColor: 'white',
+    backgroundColor: '#F44336',
+    padding: 6,
     borderRadius: 20,
-    padding: 5,
-    borderWidth: 1,
-    borderColor: 'red',
+    borderWidth: 2,
+    borderColor: 'white',
+  },
+  audioPointMarker: {
+    backgroundColor: '#FF6B35',
+    padding: 8,
+    borderRadius: 25,
+    borderWidth: 3,
+    borderColor: 'white',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 5,
+  },
+  poiMarker: {
+    padding: 4,
+    borderRadius: 15,
+    borderWidth: 2,
+    borderColor: 'white',
+  },
+  trainMarker: {
+    backgroundColor: '#FF9800',
+    padding: 6,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: 'white',
+  },
+  stationMarker: {
+    backgroundColor: '#2196F3',
+    padding: 8,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: 'white',
   },
   busStopMarker: {
     backgroundColor: 'white',
