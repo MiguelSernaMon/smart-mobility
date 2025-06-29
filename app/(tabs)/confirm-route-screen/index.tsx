@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useLocalSearchParams } from 'expo-router';
 import * as Location from "expo-location";
-import { StyleSheet, View, Alert, StatusBar, Platform, SafeAreaView, FlatList, TouchableOpacity, Text } from "react-native";
+import { StyleSheet, View, Alert, StatusBar, Platform, SafeAreaView, FlatList, TouchableOpacity, Text, Modal, TextInput, ScrollView, Image } from "react-native";
 import { router } from 'expo-router';
 import * as Speech from 'expo-speech';
+import * as ImagePicker from 'expo-image-picker';
 
 import Header from "@/components/Header";
 import RouteMap from "@/components/RouteMap";
@@ -28,6 +29,20 @@ interface AudioPoint {
 interface Coordinates {
   latitude: number;
   longitude: number;
+}
+
+interface Report {
+  id: string;
+  latitude: number;
+  longitude: number;
+  title: string;
+  description: string;
+  category: 'accessibility' | 'safety' | 'infrastructure' | 'transport' | 'other';
+  imageUri?: string;
+  userId: string;
+  userName: string;
+  timestamp: number;
+  status: 'pending' | 'in_progress' | 'resolved';
 }
 
 export default function ConfirmRouteScreen() {
@@ -120,11 +135,30 @@ export default function ConfirmRouteScreen() {
   const [isPlayingAudio, setIsPlayingAudio] = useState<boolean>(false);
   const [userLocation, setUserLocation] = useState<Coordinates | null>(null);
 
+  // Estados para sistema de reportes
+  const [reports, setReports] = useState<Report[]>([]);
+  const [showReportModal, setShowReportModal] = useState<boolean>(false);
+  const [newReportLocation, setNewReportLocation] = useState<Coordinates | null>(null);
+  const [reportForm, setReportForm] = useState<{
+    title: string;
+    description: string;
+    category: Report['category'];
+    imageUri: string | null;
+  }>({
+    title: '',
+    description: '',
+    category: 'accessibility',
+    imageUri: null
+  });
+
   useEffect(() => {
     setStatusBarHeight(StatusBar.currentHeight || 0);
     
     // Inicializar puntos de audio para accesibilidad
     initializeAudioPoints();
+    
+    // Inicializar reportes
+    initializeReports();
     
     // Configurar audio para reproducir en silencio si es necesario
     configureAudio();
@@ -141,6 +175,38 @@ export default function ConfirmRouteScreen() {
       checkAudioPointProximity();
     }
   }, [userLocation, audioPoints]);
+
+  // Nuevo efecto para monitorear cambios en reportes
+  useEffect(() => {
+    console.log('📊 Cambio detectado en reportes. Total reportes:', reports.length);
+    console.log('📋 Lista completa de reportes:', reports.map(r => ({ 
+      id: r.id, 
+      title: r.title, 
+      lat: r.latitude, 
+      lng: r.longitude, 
+      category: r.category 
+    })));
+    
+    // Si hay reportes y un mapa, ajustar la vista para mostrar todos los puntos
+    if (reports.length > 0 && mapRef.current) {
+      setTimeout(() => {
+        try {
+          const allPoints = [
+            origin,
+            destiny,
+            ...reports.map(r => ({ latitude: r.latitude, longitude: r.longitude }))
+          ];
+          console.log('🗺️ Ajustando mapa para mostrar todos los puntos:', allPoints);
+          (mapRef.current as any)?.fitToCoordinates(allPoints, {
+            edgePadding: { top: 100, right: 100, bottom: 100, left: 100 },
+            animated: true
+          });
+        } catch (error) {
+          console.error('❌ Error ajustando mapa:', error);
+        }
+      }, 1000);
+    }
+  }, [reports]);
 
   // Configurar audio
   const configureAudio = async () => {
@@ -320,6 +386,222 @@ Puedes solicitar apoyo al personal del Metro, quienes están disponibles en la e
       }
     }
   };
+
+  // ============ FUNCIONES DE REPORTES ============
+
+  // Inicializar reportes (datos quemados por ahora)
+  const initializeReports = () => {
+    const sampleReports: Report[] = [
+      {
+        id: "report_1",
+        latitude: 6.254565,
+        longitude: -75.572568,
+        title: "Escalón dañado",
+        description: "Escalón roto en la entrada del metro, peligroso para personas con discapacidad visual",
+        category: 'accessibility',
+        imageUri: undefined,
+        userId: "user_1",
+        userName: "Usuario Anónimo",
+        timestamp: Date.now() - 86400000, // Hace 1 día
+        status: 'pending'
+      },
+      {
+        id: "report_2", 
+        latitude: 6.270373,
+        longitude: -75.567537,
+        title: "Semáforo sin sonido",
+        description: "El semáforo peatonal no tiene señal auditiva para personas ciegas",
+        category: 'safety',
+        imageUri: undefined,
+        userId: "user_2",
+        userName: "Reportero",
+        timestamp: Date.now() - 172800000, // Hace 2 días
+        status: 'pending'
+      }
+    ];
+    setReports(sampleReports);
+  };
+
+  // Abrir modal de reporte en ubicación específica
+  const openReportModal = (location: Coordinates) => {
+    console.log('📍 openReportModal llamado con ubicación:', location);
+    setNewReportLocation(location);
+    setReportForm({
+      title: '',
+      description: '',
+      category: 'accessibility',
+      imageUri: null
+    });
+    setShowReportModal(true);
+    console.log('📱 Modal de reporte abierto, showReportModal:', true);
+  };
+
+  // Tomar foto para el reporte
+  const takePhoto = async () => {
+    try {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permisos', 'Se necesita permiso para acceder a la cámara');
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setReportForm(prev => ({
+          ...prev,
+          imageUri: result.assets[0].uri
+        }));
+      }
+    } catch (error) {
+      console.error('Error tomando foto:', error);
+      Alert.alert('Error', 'No se pudo tomar la foto');
+    }
+  };
+
+  // Seleccionar foto de galería
+  const pickImage = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permisos', 'Se necesita permiso para acceder a la galería');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setReportForm(prev => ({
+          ...prev,
+          imageUri: result.assets[0].uri
+        }));
+      }
+    } catch (error) {
+      console.error('Error seleccionando imagen:', error);
+      Alert.alert('Error', 'No se pudo seleccionar la imagen');
+    }
+  };
+
+  // Enviar reporte
+  const submitReport = async () => {
+    if (!newReportLocation) {
+      Alert.alert('Error', 'No se pudo obtener la ubicación para el reporte');
+      return;
+    }
+
+    if (!reportForm.title.trim() || !reportForm.description.trim()) {
+      Alert.alert('Error', 'Por favor completa el título y la descripción');
+      return;
+    }
+
+    try {
+      const newReport: Report = {
+        id: `report_${Date.now()}`,
+        latitude: newReportLocation.latitude,
+        longitude: newReportLocation.longitude,
+        title: reportForm.title.trim(),
+        description: reportForm.description.trim(),
+        category: reportForm.category,
+        imageUri: reportForm.imageUri || undefined,
+        userId: "current_user", // En una app real, obtener del contexto de autenticación
+        userName: "Usuario Actual", // En una app real, obtener del contexto de autenticación
+        timestamp: Date.now(),
+        status: 'pending'
+      };
+
+      console.log('📝 Creando nuevo reporte:', newReport);
+      console.log('📍 Ubicación del reporte:', newReportLocation);
+      console.log('📊 Reportes antes de agregar:', reports.length);
+
+      // Agregar el nuevo reporte al estado
+      setReports(prevReports => {
+        const updatedReports = [...prevReports, newReport];
+        console.log('📊 Reportes después de agregar:', updatedReports.length);
+        console.log('📋 Lista de reportes actualizada:', updatedReports.map(r => ({ id: r.id, title: r.title, lat: r.latitude, lng: r.longitude })));
+        return updatedReports;
+      });
+
+      // En una app real, aquí enviarías el reporte al backend
+      console.log('✅ Reporte agregado al estado exitosamente');
+
+      // Cerrar modal y limpiar formulario
+      setShowReportModal(false);
+      setNewReportLocation(null);
+      setReportForm({
+        title: '',
+        description: '',
+        category: 'accessibility',
+        imageUri: null
+      });
+
+      Alert.alert(
+        'Reporte enviado',
+        'Tu reporte ha sido enviado exitosamente. Gracias por ayudar a mejorar la accesibilidad.',
+        [{ text: 'OK' }]
+      );
+
+    } catch (error) {
+      console.error('Error enviando reporte:', error);
+      Alert.alert('Error', 'No se pudo enviar el reporte. Inténtalo de nuevo.');
+    }
+  };
+
+  // Manejar presión en reporte del mapa
+  const handleReportPress = (report: Report) => {
+    const timeAgo = Math.floor((Date.now() - report.timestamp) / (1000 * 60 * 60 * 24));
+    const timeText = timeAgo === 0 ? 'Hoy' : `Hace ${timeAgo} día${timeAgo > 1 ? 's' : ''}`;
+    
+    Alert.alert(
+      report.title,
+      `${report.description}\n\nCategoría: ${getCategoryDisplayName(report.category)}\nReportado por: ${report.userName}\nFecha: ${timeText}\nEstado: ${getStatusDisplayName(report.status)}`,
+      [
+        ...(report.imageUri ? [{
+          text: "Ver imagen",
+          onPress: () => {
+            // En una app real, aquí abrirías un modal con la imagen
+            Alert.alert("Imagen", "Funcionalidad de vista de imagen en desarrollo");
+          }
+        }] : []),
+        {
+          text: "Cerrar",
+          style: "cancel"
+        }
+      ]
+    );
+  };
+
+  // Funciones auxiliares para reportes
+  const getCategoryDisplayName = (category: Report['category']) => {
+    const names = {
+      'accessibility': 'Accesibilidad',
+      'safety': 'Seguridad',
+      'infrastructure': 'Infraestructura',
+      'transport': 'Transporte',
+      'other': 'Otro'
+    };
+    return names[category] || 'Otro';
+  };
+
+  const getStatusDisplayName = (status: Report['status']) => {
+    const names = {
+      'pending': 'Pendiente',
+      'in_progress': 'En progreso',
+      'resolved': 'Resuelto'
+    };
+    return names[status] || 'Pendiente';
+  };
+
+  // ============ FIN FUNCIONES DE REPORTES ============
 
   useEffect(() => {
     if (params.selectedRouteId && params.polyline) {
@@ -1140,6 +1422,9 @@ useEffect(() => {
             ]
           );
         }}
+        reports={reports}
+        onMapPress={openReportModal}
+        onReportPress={handleReportPress}
       />
       
       {/* Botón flotante para probar audio de accesibilidad */}
@@ -1165,6 +1450,24 @@ useEffect(() => {
           size={24} 
           color="white" 
         />
+      </TouchableOpacity>
+
+      {/* Botón flotante para crear reportes */}
+      <TouchableOpacity
+        style={styles.reportButton}
+        onPress={() => {
+          if (userLocation) {
+            openReportModal(userLocation);
+          } else {
+            Alert.alert(
+              'Ubicación requerida',
+              'Para crear un reporte necesitamos tu ubicación actual. Por favor, activa el GPS.',
+              [{ text: 'OK' }]
+            );
+          }
+        }}
+      >
+        <Ionicons name="camera" size={24} color="white" />
       </TouchableOpacity>
 
       {/* Botón adicional para probar audio simple */}
@@ -1211,6 +1514,147 @@ useEffect(() => {
       
       {/* Mostrar mensaje solo si no hay ruta activa ni está cargando */}
       {!loading && !activeRoute && !showPredictions && <NoRoutesMessage />}
+
+      {/* Debug info para reportes */}
+      {__DEV__ && (
+        <View style={styles.debugInfo}>
+          <Text style={styles.debugText}>Reportes: {reports.length}</Text>
+          <Text style={styles.debugText}>
+            {reports.map(r => `${r.id}: ${r.title}`).join(', ')}
+          </Text>
+          <TouchableOpacity 
+            style={{ backgroundColor: 'blue', padding: 5, marginTop: 5, borderRadius: 3 }}
+            onPress={() => {
+              const testReport: Report = {
+                id: `test_${Date.now()}`,
+                latitude: 6.255000,
+                longitude: -75.573000,
+                title: "Reporte de prueba",
+                description: "Este es un reporte de prueba",
+                category: 'safety',
+                userId: "debug_user",
+                userName: "Debug User",
+                timestamp: Date.now(),
+                status: 'pending'
+              };
+              console.log('🧪 Agregando reporte de prueba:', testReport);
+              setReports(prev => {
+                const updated = [...prev, testReport];
+                console.log('🧪 Reportes después de agregar prueba:', updated.length);
+                return updated;
+              });
+            }}
+          >
+            <Text style={styles.debugText}>Agregar Reporte Prueba</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Modal para reporte de incidencias */}
+      <Modal
+        visible={showReportModal}
+        animationType="slide"
+        transparent={true}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Nuevo Reporte</Text>
+            
+            <TextInput
+              style={styles.input}
+              placeholder="Título del reporte"
+              value={reportForm.title}
+              onChangeText={text => setReportForm(prev => ({ ...prev, title: text }))}
+            />
+            
+            <TextInput
+              style={styles.input}
+              placeholder="Descripción del reporte"
+              value={reportForm.description}
+              onChangeText={text => setReportForm(prev => ({ ...prev, description: text }))}
+              multiline
+              numberOfLines={4}
+            />
+            
+            {/* Selector de categoría (nuevo diseño) */}
+            <View style={styles.categorySelector}>
+              <TouchableOpacity
+                style={[styles.categoryButton, reportForm.category === 'accessibility' && styles.categoryButtonSelected]}
+                onPress={() => setReportForm(prev => ({ ...prev, category: 'accessibility' }))}
+              >
+                <Ionicons name="accessibility" size={16} color={reportForm.category === 'accessibility' ? 'white' : '#333'} />
+                <Text style={[styles.categoryButtonText, reportForm.category === 'accessibility' && styles.categoryButtonTextSelected]}>Accesibilidad</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.categoryButton, reportForm.category === 'safety' && styles.categoryButtonSelected]}
+                onPress={() => setReportForm(prev => ({ ...prev, category: 'safety' }))}
+              >
+                <Ionicons name="warning" size={16} color={reportForm.category === 'safety' ? 'white' : '#333'} />
+                <Text style={[styles.categoryButtonText, reportForm.category === 'safety' && styles.categoryButtonTextSelected]}>Seguridad</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.categoryButton, reportForm.category === 'infrastructure' && styles.categoryButtonSelected]}
+                onPress={() => setReportForm(prev => ({ ...prev, category: 'infrastructure' }))}
+              >
+                <Ionicons name="construct" size={16} color={reportForm.category === 'infrastructure' ? 'white' : '#333'} />
+                <Text style={[styles.categoryButtonText, reportForm.category === 'infrastructure' && styles.categoryButtonTextSelected]}>Infraestructura</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.categoryButton, reportForm.category === 'transport' && styles.categoryButtonSelected]}
+                onPress={() => setReportForm(prev => ({ ...prev, category: 'transport' }))}
+              >
+                <Ionicons name="bus" size={16} color={reportForm.category === 'transport' ? 'white' : '#333'} />
+                <Text style={[styles.categoryButtonText, reportForm.category === 'transport' && styles.categoryButtonTextSelected]}>Transporte</Text>
+              </TouchableOpacity>
+            </View>
+            
+            {/* Botones para tomar foto o seleccionar de galería */}
+            <View style={styles.imagePickerContainer}>
+              <TouchableOpacity
+                style={styles.imagePickerButton}
+                onPress={takePhoto}
+              >
+                <Ionicons name="camera" size={24} color="white" />
+                <Text style={styles.imagePickerText}>Tomar Foto</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={styles.imagePickerButton}
+                onPress={pickImage}
+              >
+                <Ionicons name="images" size={24} color="white" />
+                <Text style={styles.imagePickerText}>Seleccionar Imagen</Text>
+              </TouchableOpacity>
+            </View>
+            
+            {/* Vista previa de la imagen seleccionada */}
+            {reportForm.imageUri && (
+              <Image
+                source={{ uri: reportForm.imageUri }}
+                style={styles.imagePreview}
+                resizeMode="cover"
+              />
+            )}
+            
+            <TouchableOpacity
+              style={styles.submitButton}
+              onPress={submitReport}
+            >
+              <Text style={styles.submitButtonText}>Enviar Reporte</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => setShowReportModal(false)}
+            >
+              <Text style={styles.closeButtonText}>Cerrar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   </>
 
@@ -1226,6 +1670,23 @@ const styles = StyleSheet.create({
     bottom: 80,
     right: 20,
     backgroundColor: '#FF6B35',
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+    zIndex: 1000,
+  },
+  reportButton: {
+    position: 'absolute',
+    bottom: 80,
+    right: 90,
+    backgroundColor: '#007AFF',
     width: 56,
     height: 56,
     borderRadius: 28,
@@ -1317,5 +1778,139 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#777',
     marginTop: 2,
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+  },
+  modalContent: {
+    width: '90%',
+    maxWidth: 400,
+    backgroundColor: 'white',
+    borderRadius: 8,
+    padding: 20,
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 15,
+    color: '#333',
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 4,
+    padding: 10,
+    marginBottom: 10,
+    fontSize: 16,
+    color: '#333',
+  },
+  categorySelector: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 15,
+  },
+  categoryButton: {
+    flex: 1,
+    padding: 10,
+    borderRadius: 4,
+    marginHorizontal: 5,
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  categoryButtonSelected: {
+    backgroundColor: '#FF6B35',
+    borderColor: '#FF6B35',
+  },
+  categoryButtonText: {
+    fontSize: 14,
+    color: '#333',
+    marginLeft: 5,
+  },
+  categoryButtonTextSelected: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  imagePickerContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 15,
+  },
+  imagePickerButton: {
+    flex: 1,
+    padding: 10,
+    borderRadius: 4,
+    marginHorizontal: 5,
+    backgroundColor: '#FF6B35',
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexDirection: 'row',
+  },
+  imagePickerText: {
+    color: 'white',
+    fontSize: 16,
+    marginLeft: 5,
+  },
+  imagePreview: {
+    width: '100%',
+    height: 200,
+    borderRadius: 4,
+    marginBottom: 15,
+  },
+  submitButton: {
+    backgroundColor: '#4CAF50',
+    paddingVertical: 12,
+    borderRadius: 4,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  submitButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  closeButton: {
+    backgroundColor: '#757575',
+    paddingVertical: 10,
+    borderRadius: 4,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  closeButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  modalOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    zIndex: 999,
+  },
+  debugInfo: {
+    position: 'absolute',
+    top: 100,
+    left: 10,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    padding: 10,
+    borderRadius: 5,
+    zIndex: 1000,
+  },
+  debugText: {
+    color: 'white',
+    fontSize: 12,
   },
 });

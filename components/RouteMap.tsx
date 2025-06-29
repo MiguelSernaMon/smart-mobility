@@ -35,6 +35,20 @@ interface AudioPoint {
   triggered: boolean;
 }
 
+interface Report {
+  id: string;
+  latitude: number;
+  longitude: number;
+  title: string;
+  description: string;
+  category: 'accessibility' | 'safety' | 'infrastructure' | 'transport' | 'other';
+  imageUri?: string;
+  userId: string;
+  userName: string;
+  timestamp: number;
+  status: 'pending' | 'in_progress' | 'resolved';
+}
+
 interface RouteMapProps {
   mapRef: React.RefObject<MapView>;
   origin: { latitude: number; longitude: number };
@@ -48,6 +62,9 @@ interface RouteMapProps {
   onPOIPress?: (poi: any) => void;
   audioPoints?: AudioPoint[];
   onAudioPointPress?: (point: AudioPoint) => void;
+  reports?: Report[];
+  onReportPress?: (report: Report) => void;
+  onMapPress?: (coordinate: { latitude: number; longitude: number }) => void;
 }
 
 const RouteMap = ({ 
@@ -62,8 +79,14 @@ const RouteMap = ({
   POIs  = [] , 
   onPOIPress = () => {},
   audioPoints = [],
-  onAudioPointPress = () => {}
+  onAudioPointPress = () => {},
+  reports = [],
+  onReportPress = () => {},
+  onMapPress = () => {}
 }: RouteMapProps) => {
+  
+  // Log para debug de reportes
+  console.log(`🗺️ RouteMap recibió ${reports.length} reportes:`, reports.map(r => ({ id: r.id, title: r.title })));
   
   // Verificar si hay una ruta activa o seleccionada
   const selectedRoute = activeRoute;
@@ -188,6 +211,29 @@ const RouteMap = ({
     return icons[type] || 'location';
   };
 
+  // Funciones para los reportes
+  const getReportIcon = (category: Report['category']) => {
+    const icons: { [key: string]: string } = {
+      'accessibility': 'accessibility',
+      'safety': 'warning',
+      'infrastructure': 'construct',
+      'transport': 'bus',
+      'other': 'help-circle'
+    };
+    return icons[category] || 'help-circle';
+  };
+
+  const getReportColor = (category: Report['category']) => {
+    const colors: { [key: string]: string } = {
+      'accessibility': '#FF6B35',
+      'safety': '#FF3B30',
+      'infrastructure': '#FF9500',
+      'transport': '#007AFF',
+      'other': '#8E8E93'
+    };
+    return colors[category] || '#8E8E93';
+  };
+
   return (
     <MapView 
       ref={mapRef}
@@ -198,6 +244,10 @@ const RouteMap = ({
         longitude: origin.longitude,
         latitudeDelta: 0.0922,
         longitudeDelta: 0.0421,
+      }}
+      onPress={(event) => {
+        const { coordinate } = event.nativeEvent;
+        onMapPress(coordinate);
       }}
     >
       {/* Marcador de origen */}
@@ -456,6 +506,27 @@ const RouteMap = ({
           strokeWidth={2}
         />
       ))}
+
+      {/* Marcadores de reportes */}
+      {reports && reports.length > 0 && reports.map((report) => (
+        <Marker
+          key={`report-marker-${report.id}-${report.timestamp}`}
+          coordinate={{
+            latitude: parseFloat(report.latitude.toString()),
+            longitude: parseFloat(report.longitude.toString())
+          }}
+          title={report.title}
+          description={`${report.category} - ${report.description}`}
+          onPress={() => {
+            console.log(`🔄 Presionado reporte: ${report.id}`);
+            onReportPress && onReportPress(report);
+          }}
+        >
+          <View style={[styles.reportMarker, { backgroundColor: getReportColor(report.category) }]}>
+            <Ionicons name={getReportIcon(report.category) as any} size={18} color="white" />
+          </View>
+        </Marker>
+      ))}
     </MapView>
   );
 };
@@ -480,6 +551,17 @@ const styles = StyleSheet.create({
   },
   audioPointMarker: {
     backgroundColor: '#FF6B35',
+    padding: 8,
+    borderRadius: 25,
+    borderWidth: 3,
+    borderColor: 'white',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 5,
+  },
+  reportMarker: {
     padding: 8,
     borderRadius: 25,
     borderWidth: 3,
