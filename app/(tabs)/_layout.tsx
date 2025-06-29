@@ -7,7 +7,7 @@ import { IconSymbol } from '@/components/ui/IconSymbol';
 import TabBarBackground from '@/components/ui/TabBarBackground';
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
-import { FontAwesome } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
@@ -34,8 +34,8 @@ export default function TabLayout() {
         name="index"
         options={{
           title: "Home",
-          tabBarIcon: ({ color }) => (
-            <IconSymbol size={28} name="house.fill" color={color} />
+          tabBarIcon: ({ color }: { color: string }) => (
+            <Ionicons name="home" size={24} color={color} />
           ),
         }}
       />
@@ -43,8 +43,8 @@ export default function TabLayout() {
         name="explore"
         options={{
           title: "Explore",
-          tabBarIcon: ({ color }) => (
-            <IconSymbol size={28} name="location.fill" color={color} />
+          tabBarIcon: ({ color }: { color: string }) => (
+            <Ionicons name="search" size={24} color={color} />
           ),
         }}
       />
@@ -52,10 +52,27 @@ export default function TabLayout() {
         name="confirm-route-screen/index"
         options={{
           title: "Navigation",
-          tabBarIcon: ({ color }) => (
-            <IconSymbol size={28} name="map.fill" color={color} />
+          tabBarIcon: ({ color }: { color: string }) => (
+            <Ionicons name="map" size={24} color={color} />
           ),
- // Esto hace que no sea accesible directamente desde la barra de tabs
+        }}
+      />
+      <Tabs.Screen
+        name="about-us/index"
+        options={{
+          title: "About Us",
+          tabBarIcon: ({ color }: { color: string }) => (
+            <Ionicons name="information-circle" size={24} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="profile-screen/index"
+        options={{
+          title: "Profile",
+          tabBarIcon: ({ color }: { color: string }) => (
+            <Ionicons name="person" size={24} color={color} />
+          ),
         }}
       />
     </Tabs>
