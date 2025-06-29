@@ -1445,7 +1445,7 @@ useEffect(() => {
                 style={[styles.categoryButton, reportForm.category === 'accessibility' && styles.categoryButtonSelected]}
                 onPress={() => setReportForm(prev => ({ ...prev, category: 'accessibility' }))}
               >
-                <Ionicons name="accessibility" size={16} color={reportForm.category === 'accessibility' ? 'white' : '#333'} />
+                <Ionicons name="accessibility" size={14} color={reportForm.category === 'accessibility' ? 'white' : '#333'} />
                 <Text style={[styles.categoryButtonText, reportForm.category === 'accessibility' && styles.categoryButtonTextSelected]}>Accesibilidad</Text>
               </TouchableOpacity>
               
@@ -1453,7 +1453,7 @@ useEffect(() => {
                 style={[styles.categoryButton, reportForm.category === 'safety' && styles.categoryButtonSelected]}
                 onPress={() => setReportForm(prev => ({ ...prev, category: 'safety' }))}
               >
-                <Ionicons name="warning" size={16} color={reportForm.category === 'safety' ? 'white' : '#333'} />
+                <Ionicons name="warning" size={14} color={reportForm.category === 'safety' ? 'white' : '#333'} />
                 <Text style={[styles.categoryButtonText, reportForm.category === 'safety' && styles.categoryButtonTextSelected]}>Seguridad</Text>
               </TouchableOpacity>
               
@@ -1461,7 +1461,7 @@ useEffect(() => {
                 style={[styles.categoryButton, reportForm.category === 'infrastructure' && styles.categoryButtonSelected]}
                 onPress={() => setReportForm(prev => ({ ...prev, category: 'infrastructure' }))}
               >
-                <Ionicons name="construct" size={16} color={reportForm.category === 'infrastructure' ? 'white' : '#333'} />
+                <Ionicons name="construct" size={14} color={reportForm.category === 'infrastructure' ? 'white' : '#333'} />
                 <Text style={[styles.categoryButtonText, reportForm.category === 'infrastructure' && styles.categoryButtonTextSelected]}>Infraestructura</Text>
               </TouchableOpacity>
               
@@ -1469,7 +1469,7 @@ useEffect(() => {
                 style={[styles.categoryButton, reportForm.category === 'transport' && styles.categoryButtonSelected]}
                 onPress={() => setReportForm(prev => ({ ...prev, category: 'transport' }))}
               >
-                <Ionicons name="bus" size={16} color={reportForm.category === 'transport' ? 'white' : '#333'} />
+                <Ionicons name="bus" size={14} color={reportForm.category === 'transport' ? 'white' : '#333'} />
                 <Text style={[styles.categoryButtonText, reportForm.category === 'transport' && styles.categoryButtonTextSelected]}>Transporte</Text>
               </TouchableOpacity>
             </View>
@@ -1638,28 +1638,34 @@ const styles = StyleSheet.create({
   },
   categorySelector: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'space-between',
     marginBottom: 15,
   },
   categoryButton: {
-    flex: 1,
-    padding: 10,
-    borderRadius: 4,
-    marginHorizontal: 5,
+    width: '48%',
+    padding: 8,
+    borderRadius: 6,
+    marginBottom: 8,
     backgroundColor: '#f0f0f0',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#ddd',
+    flexDirection: 'row',
+    minHeight: 40,
   },
   categoryButtonSelected: {
     backgroundColor: '#FF6B35',
     borderColor: '#FF6B35',
   },
   categoryButtonText: {
-    fontSize: 14,
+    fontSize: 11,
     color: '#333',
-    marginLeft: 5,
+    marginLeft: 4,
+    fontWeight: '500',
+    textAlign: 'center',
+    flex: 1,
   },
   categoryButtonTextSelected: {
     color: 'white',
