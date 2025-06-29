@@ -264,7 +264,7 @@ const RouteMap: React.FC<RouteMapProps> = ({
         description="Tu ubicación actual"
       >
         <View style={styles.originMarker}>
-          <Ionicons name="person-circle" size={20} color="white" />
+          <Ionicons name="person-circle" size={24} color="white" />
         </View>
       </Marker>
       
@@ -275,7 +275,7 @@ const RouteMap: React.FC<RouteMapProps> = ({
         description="Tu destino seleccionado"
       >
         <View style={styles.destinyMarker}>
-          <Ionicons name="flag" size={18} color="white" />
+          <Ionicons name="flag" size={20} color="white" />
         </View>
       </Marker>
 
@@ -292,7 +292,7 @@ const RouteMap: React.FC<RouteMapProps> = ({
           onCalloutPress={() => onPOIPress(poi)}
         >
           <View style={[styles.poiMarker, { backgroundColor: getPOIColor(poi.placeType) }]}>
-            <Ionicons name={getPOIIcon(poi.placeType) as any} size={14} color="white" />
+            <Ionicons name={getPOIIcon(poi.placeType) as any} size={16} color="white" />
           </View>
         </Marker>
       ))}
@@ -362,7 +362,7 @@ const RouteMap: React.FC<RouteMapProps> = ({
                 zIndex={4}
               >
                 <View style={styles.busStopMarker}>
-                  <Ionicons name="bus" size={14} color="#1976D2" />
+                  <Ionicons name="bus" size={16} color="#1976D2" />
                 </View>
               </Marker>
               
@@ -375,7 +375,7 @@ const RouteMap: React.FC<RouteMapProps> = ({
                 zIndex={4}
               >
                 <View style={styles.busStopMarker}>
-                  <Ionicons name="bus" size={14} color="#1976D2" />
+                  <Ionicons name="bus" size={16} color="#1976D2" />
                 </View>
               </Marker>
             </React.Fragment>
@@ -403,7 +403,7 @@ const RouteMap: React.FC<RouteMapProps> = ({
                 zIndex={4}
               >
                 <View style={styles.metroStopMarker}>
-                  <Ionicons name="train" size={14} color="#FF5722" />
+                  <Ionicons name="train" size={16} color="#FF5722" />
                 </View>
               </Marker>
               
@@ -416,7 +416,7 @@ const RouteMap: React.FC<RouteMapProps> = ({
                 zIndex={4}
               >
                 <View style={styles.metroStopMarker}>
-                  <Ionicons name="train" size={14} color="#FF5722" />
+                  <Ionicons name="train" size={16} color="#FF5722" />
                 </View>
               </Marker>
             </React.Fragment>
@@ -459,7 +459,7 @@ const RouteMap: React.FC<RouteMapProps> = ({
           zIndex={5}
         >
           <View style={styles.schoolZoneMarker}>
-            <Ionicons name="school" size={14} color="#FF9800" />
+            <Ionicons name="school" size={16} color="#FF9800" />
           </View>
         </Marker>
       ))}
@@ -477,7 +477,7 @@ const RouteMap: React.FC<RouteMapProps> = ({
           onPress={() => onAudioPointPress && onAudioPointPress(point)}
         >
           <View style={styles.audioPointMarker}>
-            <Ionicons name="volume-high" size={16} color="white" />
+            <Ionicons name="volume-high" size={18} color="white" />
           </View>
         </Marker>
       ))}
@@ -512,7 +512,7 @@ const RouteMap: React.FC<RouteMapProps> = ({
           }}
         >
           <View style={[styles.reportMarker, { backgroundColor: getReportColor(report.category) }]}>
-            <Ionicons name={getReportIcon(report.category) as any} size={14} color="white" />
+            <Ionicons name={getReportIcon(report.category) as any} size={16} color="white" />
           </View>
         </Marker>
       ))}
@@ -526,53 +526,52 @@ const styles = StyleSheet.create({
   },
   originMarker: {
     backgroundColor: '#4CAF50',
-    padding: 6,
-    borderRadius: 18,
-    borderWidth: 2,
+    padding: 8,
+    borderRadius: 25,
+    borderWidth: 3,
     borderColor: 'white',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.3,
-    shadowRadius: 3,
-    elevation: 6,
-    width: 36,
-    height: 36,
-    justifyContent: 'center',
-    alignItems: 'center',
+    shadowRadius: 4,
+    elevation: 8,
   },
   destinyMarker: {
     backgroundColor: '#F44336',
-    padding: 6,
-    borderRadius: 18,
-    borderWidth: 2,
+    padding: 8,
+    borderRadius: 25,
+    borderWidth: 3,
     borderColor: 'white',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.3,
-    shadowRadius: 3,
-    elevation: 6,
-    width: 36,
-    height: 36,
-    justifyContent: 'center',
-    alignItems: 'center',
+    shadowRadius: 4,
+    elevation: 8,
   },
   audioPointMarker: {
     backgroundColor: '#FF6B35',
-    padding: 6,
-    borderRadius: 18,
-    borderWidth: 2,
+    padding: 10,
+    borderRadius: 28,
+    borderWidth: 3,
     borderColor: 'white',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
-    elevation: 6,
-    width: 36,
-    height: 36,
-    justifyContent: 'center',
-    alignItems: 'center',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.4,
+    shadowRadius: 4,
+    elevation: 10,
   },
   reportMarker: {
+    padding: 10,
+    borderRadius: 28,
+    borderWidth: 3,
+    borderColor: 'white',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.4,
+    shadowRadius: 4,
+    elevation: 10,
+  },
+  poiMarker: {
     padding: 6,
     borderRadius: 18,
     borderWidth: 2,
@@ -582,25 +581,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 3,
     elevation: 6,
-    width: 36,
-    height: 36,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  poiMarker: {
-    padding: 4,
-    borderRadius: 14,
-    borderWidth: 2,
-    borderColor: 'white',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
-    elevation: 5,
-    width: 28,
-    height: 28,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   trainMarker: {
     backgroundColor: '#FF9800',
@@ -618,8 +598,8 @@ const styles = StyleSheet.create({
   },
   busStopMarker: {
     backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 4,
+    borderRadius: 20,
+    padding: 6,
     borderWidth: 2,
     borderColor: '#1976D2',
     shadowColor: '#000',
@@ -627,15 +607,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 3,
     elevation: 5,
-    width: 32,
-    height: 32,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   metroStopMarker: {
     backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 4,
+    borderRadius: 20,
+    padding: 6,
     borderWidth: 2,
     borderColor: '#FF5722',
     shadowColor: '#000',
@@ -643,26 +619,22 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 3,
     elevation: 5,
-    width: 32,
-    height: 32,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   speedLimitMarker: {
     backgroundColor: 'white',
-    borderRadius: 20,
-    padding: 4,
-    borderWidth: 2,
+    borderRadius: 22,
+    padding: 6,
+    borderWidth: 3,
     borderColor: '#F44336',
-    width: 40,
-    height: 40,
+    width: 44,
+    height: 44,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 3,
-    elevation: 5,
+    elevation: 6,
   },
   speedLimitText: {
     fontWeight: 'bold',
@@ -671,8 +643,8 @@ const styles = StyleSheet.create({
   },
   schoolZoneMarker: {
     backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 4,
+    borderRadius: 20,
+    padding: 6,
     borderWidth: 2,
     borderColor: '#FF9800',
     shadowColor: '#000',
@@ -680,10 +652,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 3,
     elevation: 5,
-    width: 32,
-    height: 32,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   markerText: {
     fontSize: 16,

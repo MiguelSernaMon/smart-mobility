@@ -166,27 +166,13 @@ export default function ConfirmRouteScreen() {
 
   // Nuevo efecto para monitorear cambios en ubicación y puntos de audio
   useEffect(() => {
-    console.log('🔄 Cambio detectado en ubicación o puntos de audio');
-    console.log('📍 UserLocation:', userLocation);
-    console.log('📍 AudioPoints:', audioPoints.length);
-    
     if (userLocation && audioPoints.length > 0) {
-      console.log('✅ Ambos datos disponibles, verificando proximidad...');
       checkAudioPointProximity();
     }
   }, [userLocation, audioPoints]);
 
   // Nuevo efecto para monitorear cambios en reportes
   useEffect(() => {
-    console.log('📊 Cambio detectado en reportes. Total reportes:', reports.length);
-    console.log('📋 Lista completa de reportes:', reports.map(r => ({ 
-      id: r.id, 
-      title: r.title, 
-      lat: r.latitude, 
-      lng: r.longitude, 
-      category: r.category 
-    })));
-    
     // Si hay reportes y un mapa, ajustar la vista para mostrar todos los puntos
     if (reports.length > 0 && mapRef.current) {
       setTimeout(() => {
@@ -196,13 +182,12 @@ export default function ConfirmRouteScreen() {
             destiny,
             ...reports.map(r => ({ latitude: r.latitude, longitude: r.longitude }))
           ];
-          console.log('🗺️ Ajustando mapa para mostrar todos los puntos:', allPoints);
           (mapRef.current as any)?.fitToCoordinates(allPoints, {
             edgePadding: { top: 100, right: 100, bottom: 100, left: 100 },
             animated: true
           });
         } catch (error) {
-          console.error('❌ Error ajustando mapa:', error);
+          // Error ajustando mapa
         }
       }, 1000);
     }
@@ -212,10 +197,9 @@ export default function ConfirmRouteScreen() {
   const configureAudio = async () => {
     try {
       // Verificar si el speech está disponible
-      const isAvailable = await Speech.isSpeakingAsync();
-      console.log('Speech está disponible:', !isAvailable);
+      await Speech.isSpeakingAsync();
     } catch (error) {
-      console.error('Error verificando disponibilidad de speech:', error);
+      // Error verificando disponibilidad de speech
     }
   };
 
@@ -270,21 +254,14 @@ Puedes solicitar apoyo al personal del Metro, quienes están disponibles en la e
   // Reproducir audio usando text-to-speech nativo
   const playAudioDescription = async (audioText: string) => {
     try {
-      console.log('🔊 Intentando reproducir audio...');
-      console.log('📝 Texto del audio:', audioText.substring(0, 100) + '...');
-      console.log('🎵 Estado actual del audio:', { isPlayingAudio });
-      
       if (isPlayingAudio) {
-        console.log('⚠️ Ya hay un audio reproduciéndose, saltando...');
         return; // Ya hay un audio reproduciéndose
       }
 
-      console.log('✅ Iniciando reproducción de audio...');
       setIsPlayingAudio(true);
 
       // Detener cualquier speech que esté en progreso
       await Speech.stop();
-      console.log('🛑 Speech anterior detenido');
 
       // Configurar opciones de speech
       const speechOptions = {
@@ -293,18 +270,15 @@ Puedes solicitar apoyo al personal del Metro, quienes están disponibles en la e
         rate: 0.7, // Velocidad más lenta para mejor comprensión
         voice: undefined, // Usar voz por defecto
         onStart: () => {
-          console.log('✅ Audio iniciado exitosamente');
+          // Audio iniciado
         },
         onDone: () => {
-          console.log('✅ Audio terminado');
           setIsPlayingAudio(false);
         },
         onStopped: () => {
-          console.log('🛑 Audio detenido');
           setIsPlayingAudio(false);
         },
         onError: (error: any) => {
-          console.error('❌ Error en speech:', error);
           setIsPlayingAudio(false);
           // Mostrar alerta con el texto como fallback
           Alert.alert(
@@ -316,13 +290,9 @@ Puedes solicitar apoyo al personal del Metro, quienes están disponibles en la e
       };
 
       // Reproducir el audio
-      console.log('🎤 Llamando a Speech.speak...');
       Speech.speak(audioText, speechOptions);
       
-      console.log('✅ Speech.speak llamado exitosamente');
-      
     } catch (error) {
-      console.error('❌ Error reproduciendo audio:', error);
       setIsPlayingAudio(false);
       
       // Fallback: mostrar el texto en una alerta
@@ -336,12 +306,7 @@ Puedes solicitar apoyo al personal del Metro, quienes están disponibles en la e
 
   // Monitorear proximidad a puntos de audio
   const checkAudioPointProximity = async () => {
-    console.log('🔍 Verificando proximidad a puntos de audio...');
-    console.log('📍 Ubicación del usuario:', userLocation);
-    console.log('📍 Puntos de audio disponibles:', audioPoints.length);
-    
     if (!userLocation || audioPoints.length === 0) {
-      console.log('⚠️ No hay ubicación de usuario o puntos de audio');
       return;
     }
 
@@ -353,12 +318,8 @@ Puedes solicitar apoyo al personal del Metro, quienes están disponibles en la e
         point.longitude
       );
 
-      console.log(`📏 Distancia al punto ${point.title}: ${distance.toFixed(2)} metros (radio: ${point.radius}m, triggered: ${point.triggered})`);
-
       // Si está dentro del radio y no se ha reproducido aún
       if (distance <= point.radius && !point.triggered) {
-        console.log(`🔊 ¡USUARIO CERCA! Reproduciendo audio para ${point.title}...`);
-        
         // Marcar como activado inmediatamente
         setAudioPoints(prevPoints => 
           prevPoints.map(p => 
@@ -369,14 +330,12 @@ Puedes solicitar apoyo al personal del Metro, quienes están disponibles en la e
         // Reproducir audio inmediatamente
         try {
           await playAudioDescription(point.audioText);
-          console.log('✅ Audio reproducido exitosamente');
         } catch (error) {
-          console.error('❌ Error reproduciendo audio:', error);
+          // Error reproduciendo audio
         }
 
         // Reset del trigger después de 2 minutos para permitir activación futura
         setTimeout(() => {
-          console.log(`🔄 Reseteando trigger para ${point.title}`);
           setAudioPoints(prevPoints => 
             prevPoints.map(p => 
               p.id === point.id ? { ...p, triggered: false } : p
@@ -424,7 +383,6 @@ Puedes solicitar apoyo al personal del Metro, quienes están disponibles en la e
 
   // Abrir modal de reporte en ubicación específica
   const openReportModal = (location: Coordinates) => {
-    console.log('📍 openReportModal llamado con ubicación:', location);
     setNewReportLocation(location);
     setReportForm({
       title: '',
@@ -433,7 +391,6 @@ Puedes solicitar apoyo al personal del Metro, quienes están disponibles en la e
       imageUri: null
     });
     setShowReportModal(true);
-    console.log('📱 Modal de reporte abierto, showReportModal:', true);
   };
 
   // Tomar foto para el reporte
@@ -519,20 +476,13 @@ Puedes solicitar apoyo al personal del Metro, quienes están disponibles en la e
         status: 'pending'
       };
 
-      console.log('📝 Creando nuevo reporte:', newReport);
-      console.log('📍 Ubicación del reporte:', newReportLocation);
-      console.log('📊 Reportes antes de agregar:', reports.length);
-
       // Agregar el nuevo reporte al estado
       setReports(prevReports => {
         const updatedReports = [...prevReports, newReport];
-        console.log('📊 Reportes después de agregar:', updatedReports.length);
-        console.log('📋 Lista de reportes actualizada:', updatedReports.map(r => ({ id: r.id, title: r.title, lat: r.latitude, lng: r.longitude })));
         return updatedReports;
       });
 
       // En una app real, aquí enviarías el reporte al backend
-      console.log('✅ Reporte agregado al estado exitosamente');
 
       // Cerrar modal y limpiar formulario
       setShowReportModal(false);
@@ -551,7 +501,6 @@ Puedes solicitar apoyo al personal del Metro, quienes están disponibles en la e
       );
 
     } catch (error) {
-      console.error('Error enviando reporte:', error);
       Alert.alert('Error', 'No se pudo enviar el reporte. Inténtalo de nuevo.');
     }
   };
@@ -1017,16 +966,11 @@ const determineIconFromAddress = (address) => {
   // Iniciar monitoreo continuo de ubicación para puntos de audio
   const startLocationMonitoring = async () => {
     try {
-      console.log('🚀 Iniciando monitoreo de ubicación para puntos de audio...');
-      
       // Solicitar permisos de ubicación en primer plano
       let { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        console.log('⚠️ Permisos de ubicación denegados');
         return;
       }
-
-      console.log('✅ Permisos de ubicación concedidos, configurando seguimiento...');
 
       // Configurar el seguimiento de ubicación
       const subscription = await Location.watchPositionAsync(
@@ -1041,7 +985,6 @@ const determineIconFromAddress = (address) => {
             longitude: location.coords.longitude,
           };
           
-          console.log('📍 Nueva ubicación recibida:', newLocation);
           setUserLocation(newLocation);
           
           // Verificar proximidad a puntos de audio
@@ -1049,15 +992,12 @@ const determineIconFromAddress = (address) => {
         }
       );
 
-      console.log('✅ Monitoreo de ubicación configurado exitosamente');
-
       // Guardar la suscripción para poder cancelarla después
       return () => {
-        console.log('🛑 Deteniendo monitoreo de ubicación');
         subscription.remove();
       };
     } catch (error) {
-      console.error('❌ Error configurando monitoreo de ubicación:', error);
+      // Error configurando monitoreo de ubicación
     }
   };
 
@@ -1402,8 +1342,11 @@ useEffect(() => {
         origin={origin}
         setOrigin={setOrigin}
         destiny={destiny}
+        selectedRoute={activeRoute}
         activeRoutePolyline={activeRoutePolyline}
         POIs={showPOIs ? POIs : []}
+        speedLimits={[]}
+        schoolZones={[]}
         onPOIPress={(poi: any) => handlePOIPress(poi)}
         audioPoints={audioPoints}
         onAudioPointPress={(point: AudioPoint) => {
@@ -1427,7 +1370,7 @@ useEffect(() => {
         onReportPress={handleReportPress}
       />
       
-      {/* Botón flotante para probar audio de accesibilidad */}
+      {/* Botón flotante para accesibilidad */}
       <TouchableOpacity
         style={[styles.accessibilityButton, { backgroundColor: isPlayingAudio ? '#FF8A65' : '#FF6B35' }]}
         onPress={() => {
@@ -1435,13 +1378,10 @@ useEffect(() => {
             // Detener audio si está reproduciéndose
             Speech.stop();
             setIsPlayingAudio(false);
-            console.log('Audio detenido manualmente');
           } else if (audioPoints.length > 0) {
-            console.log('Probando audio manualmente...');
             playAudioDescription(audioPoints[0].audioText);
           } else {
-            console.log('No hay puntos de audio configurados');
-            Alert.alert('Prueba de Audio', 'No hay puntos de audio configurados');
+            Alert.alert('Audio de Accesibilidad', 'No hay puntos de audio configurados cerca de tu ubicación');
           }
         }}
       >
@@ -1469,86 +1409,9 @@ useEffect(() => {
       >
         <Ionicons name="camera" size={24} color="white" />
       </TouchableOpacity>
-
-      {/* Botón adicional para probar audio simple */}
-      <TouchableOpacity
-        style={styles.testAudioButton}
-        onPress={() => {
-          console.log('🔊 Probando audio simple...');
-          playAudioDescription("Hola, esto es una prueba de audio para accesibilidad. Si puedes escuchar esto, el sistema de audio está funcionando correctamente.");
-        }}
-      >
-        <Text style={styles.testAudioText}>🔊 Probar Audio</Text>
-      </TouchableOpacity>
-
-      {/* Botón para simular proximidad al punto de audio */}
-      <TouchableOpacity
-        style={styles.simulateProximityButton}
-        onPress={() => {
-          console.log('🎯 Simulando proximidad al punto de audio...');
-          if (audioPoints.length > 0) {
-            console.log('📍 Configurando ubicación simulada cerca del punto de audio...');
-            const point = audioPoints[0];
-            
-            // Simular que estamos muy cerca del punto (5 metros)
-            const simulatedLocation = {
-              latitude: point.latitude + 0.00004, // Aproximadamente 5 metros
-              longitude: point.longitude + 0.00004
-            };
-            
-            console.log('📍 Ubicación simulada:', simulatedLocation);
-            setUserLocation(simulatedLocation);
-            
-            // Forzar verificación inmediata
-            setTimeout(() => {
-              console.log('🔍 Forzando verificación de proximidad...');
-              checkAudioPointProximity();
-            }, 1000);
-          } else {
-            console.log('⚠️ No hay puntos de audio configurados');
-          }
-        }}
-      >
-        <Text style={styles.testAudioText}>🎯 Simular Cerca</Text>
-      </TouchableOpacity>
       
       {/* Mostrar mensaje solo si no hay ruta activa ni está cargando */}
       {!loading && !activeRoute && !showPredictions && <NoRoutesMessage />}
-
-      {/* Debug info para reportes */}
-      {__DEV__ && (
-        <View style={styles.debugInfo}>
-          <Text style={styles.debugText}>Reportes: {reports.length}</Text>
-          <Text style={styles.debugText}>
-            {reports.map(r => `${r.id}: ${r.title}`).join(', ')}
-          </Text>
-          <TouchableOpacity 
-            style={{ backgroundColor: 'blue', padding: 5, marginTop: 5, borderRadius: 3 }}
-            onPress={() => {
-              const testReport: Report = {
-                id: `test_${Date.now()}`,
-                latitude: 6.255000,
-                longitude: -75.573000,
-                title: "Reporte de prueba",
-                description: "Este es un reporte de prueba",
-                category: 'safety',
-                userId: "debug_user",
-                userName: "Debug User",
-                timestamp: Date.now(),
-                status: 'pending'
-              };
-              console.log('🧪 Agregando reporte de prueba:', testReport);
-              setReports(prev => {
-                const updated = [...prev, testReport];
-                console.log('🧪 Reportes después de agregar prueba:', updated.length);
-                return updated;
-              });
-            }}
-          >
-            <Text style={styles.debugText}>Agregar Reporte Prueba</Text>
-          </TouchableOpacity>
-        </View>
-      )}
 
       {/* Modal para reporte de incidencias */}
       <Modal
@@ -1676,10 +1539,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 8,
     zIndex: 1000,
   },
   reportButton: {
@@ -1693,50 +1556,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 8,
     zIndex: 1000,
-  },
-  testAudioButton: {
-    position: 'absolute',
-    bottom: 150,
-    right: 20,
-    backgroundColor: '#4CAF50',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-    zIndex: 1000,
-  },
-  simulateProximityButton: {
-    position: 'absolute',
-    bottom: 220,
-    right: 20,
-    backgroundColor: '#FF9800',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-    zIndex: 1000,
-  },
-  testAudioText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: 'bold',
   },
   predictionsContainer: {
     position: 'absolute',
@@ -1899,18 +1723,5 @@ const styles = StyleSheet.create({
     bottom: 0,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     zIndex: 999,
-  },
-  debugInfo: {
-    position: 'absolute',
-    top: 100,
-    left: 10,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    padding: 10,
-    borderRadius: 5,
-    zIndex: 1000,
-  },
-  debugText: {
-    color: 'white',
-    fontSize: 12,
   },
 });
